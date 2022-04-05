@@ -1,0 +1,7 @@
+boto3
+aws_cdk.aws_ecs 
+aws_cdk.aws_ec2 
+aws_cdk.aws_elasticloadbalancingv2
+aws_cdk.aws_iam 
+aws_cdk.aws_efs 
+aws_cdk.core

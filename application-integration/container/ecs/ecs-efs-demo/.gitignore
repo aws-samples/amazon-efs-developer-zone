@@ -1,0 +1,6 @@
+.idea
+.swp
+.pyc
+cdk.out
+cdk.context.json
+task_definition.automated

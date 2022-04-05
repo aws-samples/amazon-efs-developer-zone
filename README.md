@@ -11,12 +11,12 @@ You can access Amazon EFS from:
     - Servier
     - Virtual Machine 
 - Within AWS via
-    - Amazon Elastic Compute Cloud (Amazon EC2)
-    - Amazon Elastic Container Service (Amazon ECS)
-    - Amazon Elastic Kubernetes Service (Amazon EKS)
-    - AWS Fargate
-    - AWS Lambda
-    - Amazon SageMaker
+    - [Amazon Elastic Compute Cloud (Amazon EC2)](https://docs.aws.amazon.com/ec2/index.html)
+    - [Amazon Elastic Container Service (Amazon ECS)](https://docs.aws.amazon.com/ecs/index.html)
+    - [Amazon Elastic Kubernetes Service (Amazon EKS)](https://docs.aws.amazon.com/eks/index.html)
+    - [AWS Fargate](https://aws.amazon.com/fargate/)
+    - [AWS Lambda](https://docs.aws.amazon.com/lambda/index.html)
+    - [Amazon SageMaker](https://docs.aws.amazon.com/sagemaker/index.html)
 
 
 ![](img/i1.png)
@@ -24,7 +24,7 @@ You can access Amazon EFS from:
 So, if you are an application developer what this means to you is that, you can use Amazon EFS for:
 - Mounting the EFS file system on your virtual machine and share the data across multiple virtual machine and use it as a `local storage`
 - Your containerised application, e.g with Docker and use that as a `docker volume` 
-- Your containerised application in your Kubernetes envionment as a `storageclass`. And the file system can be used by the application(pod) using a `PersistentVolumeClaim` object. 
+- Your containerised application in the Kubernetes envionment as a `storageclass`. And the file system can be used by the application(pod) using a `PersistentVolumeClaim` object. 
 - Your Machine Learning pipeline(`training` and `inference`), where your training dataset or model artifacts can be saved on this shared file system. 
 
 The Amazon EFS file system is built to scale on demand to petabytes without disrupting applications. EFS is a fully-managed service that makes it easy to set up and scale file storage in the Amazon Cloud. And hence it provides elastic storage capacity with a pay for what you use scheme (in contrast to EBS with which you pay for what you provision). EFS is elastic and grows and shrinks as you add and remove data. 
@@ -142,6 +142,8 @@ In this section we will dive into how you can setup Amazon EFS with Amazon ECS a
 | **Static Provisioning using Amazon EFS for Amazon EKS** | [![](/img/efs-tutorial-button.png)](/application-integration/container/eks/static_provisioning) |
 | **Dynamic Provisioning using Amazon EFS for Amazon EKS** | [![](/img/efs-tutorial-button.png)](application-integration/container/eks/dynamic_provisioning) |
 | **Machine Learning at scale using Kubeflow on Amazon EKS with Amazon EFS** | [![](/img/efs-tutorial-button.png)](/application-integration/container/eks/kubeflow) |
+| **Building a cloud file manager using Amazon ECS(Fargate) and Amazon EFS** | [![](/img/efs-tutorial-button.png)](/application-integration/container/ecs/ecs-efs-demo/) |
+| **Bitcoin Blockchain with Amazon ECS and Amazon EFS** | [![](/img/efs-tutorial-button.png)](/application-integration/container/ecs/ecs-efs-bitcoin) |
 
 
 ## AWS re:Invernt Sessions 
