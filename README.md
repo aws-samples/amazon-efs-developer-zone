@@ -1,15 +1,15 @@
 # Welcome to Amazon EFS Developer Zone
 
-Welcome to [Amazon Elastic File System(Amazon EFS)](https://docs.aws.amazon.com/efs/index.html) Developer Zone, your one shop store for all things around Amazon EFS and beyond. This page is intendent to all the builders who are new to Amazon EFS and would like to learn more about it. You will also get a better understanding of how Amazon EFS works with other AWS services and most importantly how you can leverage Amazon EFS for your application, wether it runs on virtual machine, container, or is completely serverless. 
+Welcome to [Amazon Elastic File System(Amazon EFS)](https://docs.aws.amazon.com/efs/index.html) Developer Zone, your one shop store for all things around Amazon EFS and beyond. This page is intendent to all the builders who are new to Amazon EFS and would like to learn more about it. You will also get a better understanding of how Amazon EFS works and integrates with other AWS services and most importantly how you can leverage Amazon EFS for your application, wether your application runs on virtual machine, container, or is completely serverless. 
 
 ## Introduction 
 
-So, before we get started let's first spend sometime to understand what is Amazon EFS. Amazon EFS, launched in Jun 2016, is a simple, serverless, set-and-forget cloud-native, elastic file system designed to be consumed at scale from any AWS compute service, including container and serverless services like Amazon ECS, Amazon EKS, AWS Fargate and AWS Lambda. So, thats quite mouthsome, lets break it down, and start from the basics, Amazon EFS is a network share storage service which you can use to store your data for your application, which can be accessed by multiple compute services at the same time and is completely serverless. 
+So, before we get started let's first spend sometime to understand what is `Amazon EFS`. At its core it is a simple, serverless, set-and-forget cloud-native, elastic file system designed to be consumed at scale from on-prem or from any AWS compute service, including container and serverless services (like Amazon ECS, Amazon EKS, AWS Fargate and AWS Lambda). So, thats quite mouthsome, lets break it down and start from the basics. Amazon EFS is a network share storage service, which you can be used to store your application data, and can be accessed by multiple compute services at the same time and is completely serverless. 
 
 You can access Amazon EFS from:
 - On-premise via 
-    - Servier
-    - Virtual Machine 
+    - Physical Servers
+    - Virtual Machines 
 - Within AWS via
     - [Amazon Elastic Compute Cloud (Amazon EC2)](https://docs.aws.amazon.com/ec2/index.html)
     - [Amazon Elastic Container Service (Amazon ECS)](https://docs.aws.amazon.com/ecs/index.html)
@@ -21,13 +21,14 @@ You can access Amazon EFS from:
 
 ![](img/i1.png)
 
-So, if you are an application developer what this means to you is that, you can use Amazon EFS for:
+So, if you are an application developer, what this means to you is that, you can use `Amazon EFS` for :
+
 - Mounting the EFS file system on your virtual machine and share the data across multiple virtual machine and use it as a `local storage`
 - Your containerised application, e.g with Docker and use that as a `docker volume` 
 - Your containerised application in the Kubernetes envionment as a `storageclass`. And the file system can be used by the application(pod) using a `PersistentVolumeClaim` object. 
 - Your Machine Learning pipeline(`training` and `inference`), where your training dataset or model artifacts can be saved on this shared file system. 
 
-The Amazon EFS file system is built to scale on demand to petabytes without disrupting applications. EFS is a fully-managed service that makes it easy to set up and scale file storage in the Amazon Cloud. And hence it provides elastic storage capacity with a pay for what you use scheme (in contrast to EBS with which you pay for what you provision). EFS is elastic and grows and shrinks as you add and remove data. 
+The Amazon EFS file system is built to scale on demand to [petabytes](https://simple.wikipedia.org/wiki/Petabyte) without disrupting applications. EFS is a fully-managed service that makes it easy to set up and scale file storage in the Amazon Cloud. And hence it provides elastic storage capacity with a pay for what you use scheme (in contrast to EBS with which you pay for what you provision). EFS is elastic and grows and shrinks as you add and remove data. 
 
 ## Recent Announcement 
 
@@ -38,7 +39,7 @@ The Amazon EFS file system is built to scale on demand to petabytes without disr
 
 ## How Amazon EFS Works
 
-Now, lets get dive deep and understand how it works. Let’s take a closer look at how Amazon EFS works, compared to Elastic Block Store (EBS) and the instance store. If we look at the image bellow, we will see that an EBS volume is tied to a data center (also called an AZ) and can only be attached over the network to a single EC2 instance from the same data center. Typically EBS volumes are used as the root volumes that contain the operating system, or for relational database systems to store the state. An instance store consists of a disk which directly attached to the hardware the EC2 instance is running on. An instance store can be regarded as ephemeral storage, and is therefore used for caching or for NoSQL databases with embedded data replication only. The data in an instance store persists only during the lifetime of its associated instance. If an instance reboots (intentionally or unintentionally), data in the instance store persists. However, data in the instance store is lost if the instance `stops or hibernates or terminates` or the underlying disck drive fails. 
+Now, lets get dive deep and understand how it works. Let’s take a closer look at how `Amazon EFS` works, compared to [Amazon Elastic Block Store (EBS)](https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/AmazonEBS.html) and [the instance store](https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/AmazonEBS.html). If we look at the image bellow, we will see that an EBS volume is tied to a data center (also called an AZ) and can only be attached over the network to a single EC2 instance from the same data center. Typically EBS volumes are used as the root volumes that contain the operating system, or for relational database systems to store the state. An instance store consists of a disk which directly attached to the hardware the EC2 instance is running on. An instance store can be regarded as ephemeral storage, and is therefore used for caching or for NoSQL databases with embedded data replication only. The data in an instance store persists only during the lifetime of its associated instance. If an instance reboots (intentionally or unintentionally), data in the instance store persists. However, data in the instance store is lost if the instance `stops` or `hibernates` or `terminates` or the `underlying disk drive fails`. 
 
 ![](img/i2.png)
 
@@ -48,7 +49,7 @@ There are two main components to know about:
 - `FileSystem` : Stores your data
 - `Mount target` : Makes your data accessible
 
-The filesystem is the resource that stores your data within a AWS region, but you can’t access it directly. To do so, you must create an EFS mount target in a subnet. The mount target provides a network endpoint that you can use to mount the filesystem on an EC2 instance via NFSv4.1. You can create one mount target in each Availability Zone in an AWS Region. If there are multiple subnets in an Availability Zone in your VPC, you create a mount target in one of the subnets. 
+The filesystem is the resource that stores your data within a AWS region, but you can’t access it directly. To do so, you must create an EFS mount target in a subnet. The mount target provides a network endpoint that you can use to mount the filesystem on an EC2 instance via NFSv4.1. You can create one mount target in each Availability Zone in an AWS Region. If there are multiple subnets in an Availability Zone in your VPC, you create one mount target in one of the subnets. 
 
 ![](img/i5.png)
 
@@ -57,7 +58,8 @@ The filesystem is the resource that stores your data within a AWS region, but yo
 
 The filesystem is the resource that stores your files and directories. EFS grows with your storage needs. You don’t have to provision the storage up front. The filesystem is located in an AWS region and stores your data under the covers across multiple availability zones within that region.
 
-You can create an EFS file system via, AWS Console, CLI, or API(via SDK). And here we will use CloudFormation to set up the filesystem now.
+You can create an EFS file system via, AWS Console, CLI, or API(via SDK). And here we will use [AWS CloudFormation](https://docs.aws.amazon.com/cloudformation/) to set up the filesystem now.
+
 The bare minimum to describe a filesystem resource is shown here:
 
 ```yaml
@@ -74,7 +76,7 @@ Optionally, you can add tags to track costs or add other useful meta data with t
 
 ## Create a mount target
 
-An EFS mount target makes your data available to any compute resource via the NFSv4.1 protocol in a single AZ. Any compute resource communicates with the mount target via a TCP/IP network connection. And just like any other resource within AWS, you can control the access to your EFS File System using Security Groups. This Security group controls which traffic is allowed to enter the mount target. The NFS protocol uses port 2049 for inbound communication.
+An EFS mount target makes your data available to any compute resource via the NFSv4.1 protocol in a single AZ. Any compute resource communicates with the mount target via a TCP/IP network connection. And just like any other resource within AWS, you can control the access to your EFS File System using Security Groups. This Security group controls which traffic is allowed to enter the mount target. The `NFS` protocol uses port `2049` for inbound communication.
 
 ![](img/i4.png)
 
@@ -145,7 +147,7 @@ In this section we will dive into how you can setup Amazon EFS with AWS Lambda a
 
 ## Amazon EFS with Container 
 
-In this section we will dive into how you can setup Amazon EFS with Amazon ECS and Amazon EKS. 
+In this section we will dive into how you can setup Amazon EFS with containers using Amazon ECS and Amazon EKS. 
 
 | Tutorial | Link
 | --- | ---
