@@ -29,6 +29,11 @@ So, if you are an application developer what this means to you is that, you can 
 
 The Amazon EFS file system is built to scale on demand to petabytes without disrupting applications. EFS is a fully-managed service that makes it easy to set up and scale file storage in the Amazon Cloud. And hence it provides elastic storage capacity with a pay for what you use scheme (in contrast to EBS with which you pay for what you provision). EFS is elastic and grows and shrinks as you add and remove data. 
 
+## Recent Announcement 
+
+- [Amazon EFS Replication](https://aws.amazon.com/blogs/aws/new-replication-for-amazon-elastic-file-system-efs/) : 25th Jan 2022
+- [Amazon Elastic File System Sub-Millisecond Read Latency](https://aws.amazon.com/blogs/aws/amazon-elastic-file-system-update-sub-millisecond-read-latency/) : 14th Feb 2022
+
 ## How Amazon EFS Works
 
 Now, lets get dive deep and understand how it works. Let’s take a closer look at how Amazon EFS works, compared to Elastic Block Store (EBS) and the instance store. If we look at the image bellow, we will see that an EBS volume is tied to a data center (also called an AZ) and can only be attached over the network to a single EC2 instance from the same data center. Typically EBS volumes are used as the root volumes that contain the operating system, or for relational database systems to store the state. An instance store consists of a disk which directly attached to the hardware the EC2 instance is running on. An instance store can be regarded as ephemeral storage, and is therefore used for caching or for NoSQL databases with embedded data replication only. The data in an instance store persists only during the lifetime of its associated instance. If an instance reboots (intentionally or unintentionally), data in the instance store persists. However, data in the instance store is lost if the instance `stops or hibernates or terminates` or the underlying disck drive fails. 
