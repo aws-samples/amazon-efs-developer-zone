@@ -1,0 +1,4 @@
+float32 latitude
+float32 longitude
+uint8 latitude_direction
+uint8 longitude_direction

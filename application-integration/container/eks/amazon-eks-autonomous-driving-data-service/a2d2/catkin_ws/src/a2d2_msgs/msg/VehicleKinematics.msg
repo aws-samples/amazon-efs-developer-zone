@@ -1,0 +1,4 @@
+float32 vehicle_speed 
+LinearAcceleration acceleration
+AngularVelocity angular_velocity
+AngularOrientation angular_orientation

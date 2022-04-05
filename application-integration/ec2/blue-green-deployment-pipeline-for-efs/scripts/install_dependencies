@@ -1,0 +1,38 @@
+#!/bin/bash
+region=$(curl -s http://169.254.169.254/latest/meta-data/placement/region)
+CURRENT_DEPLOYMENT=$(aws ssm get-parameter --name "deployment" --region $region --query Parameter.Value --output text)
+DEPLOYMENT_TYPE=$(aws deploy get-deployment --deployment-id "$DEPLOYMENT_ID" --region $region --query deploymentInfo.deploymentStyle.deploymentType --output text)
+
+yum install -y httpd
+rm -rf /var/www/html
+mount -a
+
+function configure_httpd {
+service httpd start
+chkconfig httpd on
+}
+	
+if [ "$DEPLOYMENT_TYPE" == "IN_PLACE" ]; then
+ if [ "$CURRENT_DEPLOYMENT" == "green" ]; then
+   echo `date -u` ":creating symlink for GREEN deployment" >> /tmp/deploylog.txt
+   ln -s /efs/green /var/www/html
+   configure_httpd
+ elif [ "$CURRENT_DEPLOYMENT" == "blue" ]; then
+   echo `date -u` ":creating symlink for BLUE deployment" >> /tmp/deploylog.txt
+   ln -s /efs/blue /var/www/html
+   configure_httpd
+ fi  
+else
+    if [ "$CURRENT_DEPLOYMENT" == "green" ]; then
+      echo `date -u` ":creating symlink for BLUE deployment" >> /tmp/deploylog.txt
+      ln -s /efs/blue /var/www/html
+	  configure_httpd
+	elif [ "$CURRENT_DEPLOYMENT" == "blue" ] || [ "$CURRENT_DEPLOYMENT" == "null" ]; then
+	  echo `date -u` ":creating symlink for GREEN deployment" >> /tmp/deploylog.txt
+      ln -s /efs/green /var/www/html
+	  configure_httpd
+	fi 
+fi
+
+
+

@@ -1,0 +1,902 @@
+Description: >-
+  This template deploys a VPC, with a pair of public and private subnets spread
+  across two Availability Zones. It deploys an internet gateway, with a default
+  route on the public subnets. It deploys a NAT gateways and default routes for them in the private subnets.
+Parameters:
+  EnvironmentName:
+    Description: An environment name that is prefixed to resource names
+    Type: String
+    Default: bg-sample
+  VpcCIDR:
+    Description: Please enter the IP range (CIDR notation) for this VPC
+    Type: String
+    Default: 10.192.0.0/16
+  PublicSubnet1CIDR:
+    Description: >-
+      Please enter the IP range (CIDR notation) for the public subnet in the
+      first Availability Zone
+    Type: String
+    Default: 10.192.10.0/24
+  PublicSubnet2CIDR:
+    Description: >-
+      Please enter the IP range (CIDR notation) for the public subnet in the
+      second Availability Zone
+    Type: String
+    Default: 10.192.11.0/24
+  PrivateSubnet1CIDR:
+    Description: >-
+      Please enter the IP range (CIDR notation) for the private subnet in the
+      first Availability Zone
+    Type: String
+    Default: 10.192.20.0/24
+  PrivateSubnet2CIDR:
+    Description: >-
+      Please enter the IP range (CIDR notation) for the private subnet in the
+      second Availability Zone
+    Type: String
+    Default: 10.192.21.0/24
+  AmiID:
+    Default: "/aws/service/ami-amazon-linux-latest/amzn2-ami-hvm-x86_64-gp2"
+    Description: The ID of the AMI.
+    Type: AWS::SSM::Parameter::Value<AWS::EC2::Image::Id>
+  WebServerCapacity:
+    Default: '1'
+    Description: The initial number of WebServer instances
+    Type: Number
+    MinValue: '1'
+    MaxValue: '3'
+    ConstraintDescription: must be between 1 and 3 EC2 instances.
+  InstanceType:
+    Description: WebServer EC2 instance type
+    Type: String
+    Default: t3.micro
+    ConstraintDescription: must be a valid EC2 instance type.
+  ArtifactBucket:
+    Type: String
+    Description: The name of the s3 bucket you created during pre-requisites
+      
+Resources:
+  VPC:
+    Type: 'AWS::EC2::VPC'
+    Properties:
+      CidrBlock: !Ref VpcCIDR
+      EnableDnsSupport: true
+      EnableDnsHostnames: true
+      Tags:
+        - Key: Name
+          Value: !Ref EnvironmentName
+  InternetGateway:
+    Type: 'AWS::EC2::InternetGateway'
+    Properties:
+      Tags:
+        - Key: Name
+          Value: !Ref EnvironmentName
+  InternetGatewayAttachment:
+    Type: 'AWS::EC2::VPCGatewayAttachment'
+    Properties:
+      InternetGatewayId: !Ref InternetGateway
+      VpcId: !Ref VPC
+  PublicSubnet1:
+    Type: 'AWS::EC2::Subnet'
+    Properties:
+      VpcId: !Ref VPC
+      AvailabilityZone: !Select 
+        - 0
+        - !GetAZs ''
+      CidrBlock: !Ref PublicSubnet1CIDR
+      MapPublicIpOnLaunch: true
+      Tags:
+        - Key: Name
+          Value: !Sub '${EnvironmentName} Public Subnet (AZ1)'
+  PublicSubnet2:
+    Type: 'AWS::EC2::Subnet'
+    Properties:
+      VpcId: !Ref VPC
+      AvailabilityZone: !Select 
+        - 1
+        - !GetAZs ''
+      CidrBlock: !Ref PublicSubnet2CIDR
+      MapPublicIpOnLaunch: true
+      Tags:
+        - Key: Name
+          Value: !Sub '${EnvironmentName} Public Subnet (AZ2)'
+  PrivateSubnet1:
+    Type: 'AWS::EC2::Subnet'
+    Properties:
+      VpcId: !Ref VPC
+      AvailabilityZone: !Select 
+        - 0
+        - !GetAZs ''
+      CidrBlock: !Ref PrivateSubnet1CIDR
+      MapPublicIpOnLaunch: false
+      Tags:
+        - Key: Name
+          Value: !Sub '${EnvironmentName} Private Subnet (AZ1)'
+  PrivateSubnet2:
+    Type: 'AWS::EC2::Subnet'
+    Properties:
+      VpcId: !Ref VPC
+      AvailabilityZone: !Select 
+        - 1
+        - !GetAZs ''
+      CidrBlock: !Ref PrivateSubnet2CIDR
+      MapPublicIpOnLaunch: false
+      Tags:
+        - Key: Name
+          Value: !Sub '${EnvironmentName} Private Subnet (AZ2)'
+  NatGateway1EIP:
+    Type: 'AWS::EC2::EIP'
+    DependsOn: InternetGatewayAttachment
+    Properties:
+      Domain: vpc
+  NatGateway1:
+    Type: 'AWS::EC2::NatGateway'
+    Properties:
+      AllocationId: !GetAtt 
+        - NatGateway1EIP
+        - AllocationId
+      SubnetId: !Ref PublicSubnet1
+  PublicRouteTable:
+    Type: 'AWS::EC2::RouteTable'
+    Properties:
+      VpcId: !Ref VPC
+      Tags:
+        - Key: Name
+          Value: !Sub '${EnvironmentName} Public Routes'
+  DefaultPublicRoute:
+    Type: 'AWS::EC2::Route'
+    DependsOn: InternetGatewayAttachment
+    Properties:
+      RouteTableId: !Ref PublicRouteTable
+      DestinationCidrBlock: 0.0.0.0/0
+      GatewayId: !Ref InternetGateway
+  PublicSubnet1RouteTableAssociation:
+    Type: 'AWS::EC2::SubnetRouteTableAssociation'
+    Properties:
+      RouteTableId: !Ref PublicRouteTable
+      SubnetId: !Ref PublicSubnet1
+  PublicSubnet2RouteTableAssociation:
+    Type: 'AWS::EC2::SubnetRouteTableAssociation'
+    Properties:
+      RouteTableId: !Ref PublicRouteTable
+      SubnetId: !Ref PublicSubnet2
+  PrivateRouteTable1:
+    Type: 'AWS::EC2::RouteTable'
+    Properties:
+      VpcId: !Ref VPC
+      Tags:
+        - Key: Name
+          Value: !Sub '${EnvironmentName} Private Routes (AZ1)'
+  DefaultPrivateRoute1:
+    Type: 'AWS::EC2::Route'
+    Properties:
+      RouteTableId: !Ref PrivateRouteTable1
+      DestinationCidrBlock: 0.0.0.0/0
+      NatGatewayId: !Ref NatGateway1
+  PrivateSubnet1RouteTableAssociation:
+    Type: 'AWS::EC2::SubnetRouteTableAssociation'
+    Properties:
+      RouteTableId: !Ref PrivateRouteTable1
+      SubnetId: !Ref PrivateSubnet1
+  PrivateRouteTable2:
+    Type: 'AWS::EC2::RouteTable'
+    Properties:
+      VpcId: !Ref VPC
+      Tags:
+        - Key: Name
+          Value: !Sub '${EnvironmentName} Private Routes (AZ2)'
+  DefaultPrivateRoute2:
+    Type: 'AWS::EC2::Route'
+    Properties:
+      RouteTableId: !Ref PrivateRouteTable2
+      DestinationCidrBlock: 0.0.0.0/0
+      NatGatewayId: !Ref NatGateway1
+  PrivateSubnet2RouteTableAssociation:
+    Type: 'AWS::EC2::SubnetRouteTableAssociation'
+    Properties:
+      RouteTableId: !Ref PrivateRouteTable2
+      SubnetId: !Ref PrivateSubnet2
+  ApplicationLoadBalancer:
+    Type: AWS::ElasticLoadBalancingV2::LoadBalancer
+    Properties:
+      Subnets:
+       - Ref: PublicSubnet1
+       - Ref: PublicSubnet2
+      SecurityGroups:
+       - Ref: ALBSecurityGroup
+  ALBListener:
+    Type: AWS::ElasticLoadBalancingV2::Listener
+    Properties:
+      DefaultActions:
+      - Type: forward
+        TargetGroupArn:
+          Ref: ALBTargetGroup
+      LoadBalancerArn:
+        Ref: ApplicationLoadBalancer
+      Port: '80'
+      Protocol: HTTP
+  ALBTargetGroup:
+    Type: AWS::ElasticLoadBalancingV2::TargetGroup
+    Properties:
+      HealthCheckIntervalSeconds: 10
+      HealthCheckTimeoutSeconds: 5
+      HealthyThresholdCount: 2
+      Port: 80
+      Protocol: HTTP
+      UnhealthyThresholdCount: 5
+      VpcId:
+        Ref: VPC
+      TargetGroupAttributes:
+      - Key: stickiness.enabled
+        Value: 'true'
+      - Key: stickiness.type
+        Value: lb_cookie
+      - Key: stickiness.lb_cookie.duration_seconds
+        Value: '30'
+      - Key: deregistration_delay.timeout_seconds
+        Value: '30'  
+        
+  WebServerGroup:
+    Type: AWS::AutoScaling::AutoScalingGroup
+    #DeletionPolicy: Retain
+    UpdateReplacePolicy : Retain
+    DependsOn:
+      - MountTarget1
+      - MountTarget2
+    Properties:
+      #AutoScalingGroupName: my-sample-bg-deployment
+      VPCZoneIdentifier:
+        - Ref: PrivateSubnet1
+        - Ref: PrivateSubnet2
+      Tags:
+        - Key: Name
+          Value: !Ref EnvironmentName
+          PropagateAtLaunch: "true"
+        - Key: Stack-Name
+          Value: !Sub ${AWS::StackName}
+          PropagateAtLaunch: "false"          
+      LaunchConfigurationName:
+        Ref: LaunchConfig
+      MinSize: '1'
+      MaxSize: '3'
+      DesiredCapacity:
+        Ref: WebServerCapacity
+      TargetGroupARNs:
+      - Ref: ALBTargetGroup
+    CreationPolicy:
+      ResourceSignal:
+        Timeout: PT15M
+        Count:
+          Ref: WebServerCapacity
+    UpdatePolicy:
+      AutoScalingRollingUpdate:
+        MinInstancesInService: '1'
+        MaxBatchSize: '1'
+        PauseTime: PT15M
+        WaitOnResourceSignals: 'true'   
+  LaunchConfig:
+    Type: AWS::AutoScaling::LaunchConfiguration
+    #DeletionPolicy: Retain
+    UpdateReplacePolicy : Retain
+    Metadata:
+      Comment1: Configure the bootstrap helpers to install the Apache Web Server and Ruby
+      Comment2: The sample website content is downloaded from the CodeDeploy Sample
+        zip file https://docs.aws.amazon.com/codedeploy/latest/userguide/tutorials-github-upload-sample-revision.html
+      AWS::CloudFormation::Init:
+        config:
+          packages:
+            yum:
+              httpd: []
+              ruby: []
+          files:
+            "/var/www/html/index.html":
+              content: !Sub |
+                <html>
+                <head>
+                <title>HELLO AWS WORLD</title>
+                <meta http-equiv="Content-Type" content="text/html; charset=ISO-8859-1">
+                </head>
+                <body>
+                <h1>Welcome to the GREEN PHP Sample Application</h1>
+                <p/>
+                </body>
+                </html>
+              mode: '000600'
+              owner: apache
+              group: apache
+            "/etc/cfn/cfn-hup.conf":
+              content: !Sub |
+                [main]
+                stack=${AWS::StackName}
+                region=${AWS::Region}
+              mode: '000400'
+              owner: root
+              group: root
+            /etc/cfn/hooks.d/cfn-auto-reloader.conf:
+              content: !Sub |
+                [cfn-auto-reloader-hook]
+                triggers=post.update
+                path=Resources.LaunchConfig.Metadata.AWS::CloudFormation::Init
+                action=/opt/aws/bin/cfn-init -v --stack ${AWS::StackName} --resource LaunchConfig --region ${AWS::Region} --role ${CodeDeployRole}
+                runas=root
+              mode: '000400'
+              owner: root
+              group: root
+            "/home/ec2-user/install":
+              source: !Sub "https://aws-codedeploy-${AWS::Region}.s3.amazonaws.com/latest/install"
+              mode: '000755'
+          services:
+            sysvinit:
+              httpd:
+                enabled: "true"
+                ensureRunning: "true"
+              cfn-hup:
+                enabled: "true"
+                ensureRunning: "true"
+                files:
+                - /etc/cfn/cfn-hup.conf
+                - /etc/cfn/hooks.d/cfn-auto-reloader.conf
+              codedeploy-agent:
+                enabled: "true"
+                ensureRunning: "true"
+          commands:
+            00-install-agent:
+              command: "./install auto"
+              cwd: "/home/ec2-user/"
+            01-add-efs-entry:
+              command:  !Sub | 
+                echo "$(curl -s http://169.254.169.254/latest/meta-data/placement/availability-zone).${FileSystem}.efs.${AWS::Region}.amazonaws.com:/  /efs   nfs4    defaults" >> /etc/fstab
+            02-mount-efs:
+              command: mount -a    
+            03-cfn-signal:
+              command: !Sub |
+                 /opt/aws/bin/cfn-signal -e 0 --stack ${AWS::StackName} --resource WebServerGroup --region ${AWS::Region}
+    Properties:
+      ImageId:
+        Ref: AmiID
+      InstanceType:
+        Ref: InstanceType
+      SecurityGroups:
+      - Ref: WebServerSecurityGroup
+      IamInstanceProfile:
+        Ref: CodeDeployInstanceProfile
+      UserData:
+        Fn::Base64: !Sub |
+            #!/bin/bash -xe
+            yum update -y aws-cfn-bootstrap
+            mkdir /efs  >/dev/null 2>&1
+            #Install the files and packages from the metadata
+            /opt/aws/bin/cfn-init -v --stack ${AWS::StackName} --resource LaunchConfig --region ${AWS::Region} --role ${CodeDeployRole}
+  WebServerSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Enable HTTP access via port 80 locked down to the ELB and
+        SSH access
+      SecurityGroupIngress:
+      - IpProtocol: tcp
+        FromPort: '80'
+        ToPort: '80'
+        SourceSecurityGroupId:
+          Fn::Select:
+          - 0
+          - Fn::GetAtt:
+            - ApplicationLoadBalancer
+            - SecurityGroups
+      VpcId:
+        Ref: VPC
+  EFSSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Open EFS file share access
+      VpcId:
+        Ref: VPC
+      SecurityGroupIngress:
+      - IpProtocol: tcp
+        FromPort: '2049'
+        ToPort: '2049'
+        SourceSecurityGroupId:
+          Ref: WebServerSecurityGroup
+  ALBSecurityGroup:
+     Type: AWS::EC2::SecurityGroup
+     Properties:
+      GroupDescription: Open EFS file share access
+      SecurityGroupIngress:
+      - IpProtocol: tcp
+        FromPort: '80'
+        ToPort: '80'
+        CidrIp: '0.0.0.0/0'  
+      VpcId:
+        Ref: VPC
+  CodeDeployInstanceProfile:
+    Type: AWS::IAM::InstanceProfile
+    Properties:
+      Path: "/"
+      Roles:
+      - Ref: CodeDeployRole
+  CodeDeployPolicy:
+    Type: AWS::IAM::Policy
+    Properties:
+      PolicyName:
+        Fn::Sub: codedeploy-policy-${AWS::StackName}
+      PolicyDocument:
+        Statement:
+        - Effect: Allow
+          Action:
+          - "*"
+          Resource: "*"
+      Roles:
+      - Ref: CodeDeployRole
+  CodeDeployRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+        - Effect: Allow
+          Principal:
+            Service:
+            - ec2.amazonaws.com
+          Action:
+          - sts:AssumeRole
+      Path: "/"
+  FileSystem:
+    Type: AWS::EFS::FileSystem
+    Properties:
+      PerformanceMode: generalPurpose
+      Encrypted: true
+      FileSystemTags:
+      - Key: Name
+        Value: 'myefsvolume'
+  MountTarget1:
+    Type: AWS::EFS::MountTarget
+    Properties:
+      FileSystemId:
+        Ref: FileSystem
+      SubnetId: !Ref PrivateSubnet1
+      SecurityGroups:
+      - Ref: EFSSecurityGroup
+  MountTarget2:
+    Type: AWS::EFS::MountTarget
+    Properties:
+      FileSystemId:
+        Ref: FileSystem
+      SubnetId: !Ref PrivateSubnet2
+      SecurityGroups:
+      - Ref: EFSSecurityGroup    
+
+##### Pipeline resources from here ###################################
+
+  CodeCommitBGSampleRepo:
+    Type: 'AWS::CodeCommit::Repository'
+    Properties:
+      RepositoryName: !Ref 'AWS::StackName'
+      RepositoryDescription: 'CodeCommit BG deployment sample Repository'
+      Code:
+        BranchName: main
+        S3:
+          Bucket: !Ref ArtifactBucket
+          Key: 'sample-application.zip'
+  BasicParameter:
+    Type: AWS::SSM::Parameter
+    Properties:
+      Name: deployment
+      Type: String
+      Value: 'null'
+      Description: SSM Parameter for storing deployment status (green or blue).
+      
+  MyApplication:
+    Type: 'AWS::CodeDeploy::Application'
+
+  ArtifactBucketPolicy:
+    Type: 'AWS::S3::BucketPolicy'
+    Properties:
+      Bucket: !Ref ArtifactBucket
+      PolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Sid: DenyUnEncryptedObjectUploads
+            Effect: Deny
+            Principal: '*'
+            Action: 's3:PutObject'
+            Resource: !Join 
+              - ''
+              - - 'arn:aws:s3:::'
+                - !Ref ArtifactBucket
+                - /*
+            Condition:
+              StringNotEquals:
+                's3:x-amz-server-side-encryption': 'aws:kms'
+          - Sid: DenyInsecureConnections
+            Effect: Deny
+            Principal: '*'
+            Action: 's3:*'
+            Resource: !Join 
+              - ''
+              - - 'arn:aws:s3:::'
+                - !Ref ArtifactBucket
+                - /*
+            Condition:
+              Bool:
+                'aws:SecureTransport': false
+  CodePipeline:
+    Type: 'AWS::CodePipeline::Pipeline'
+    DependsOn:
+     - CreateDeploymentGroup
+     - WebServerGroup
+    Properties:
+      RoleArn: !GetAtt CustomServiceRole.Arn
+      ArtifactStore:
+        Location: !Ref ArtifactBucket
+        Type: S3
+      Stages:
+        - Name: Source
+          Actions:
+            - InputArtifacts: []
+              Name: Source
+              ActionTypeId:
+                Category: Source
+                Owner: AWS
+                Version: 1
+                Provider: CodeCommit
+              OutputArtifacts:
+                - Name: MyApp
+              Configuration:
+                BranchName: 'main'
+                RepositoryName: !Ref 'AWS::StackName'
+              RunOrder: 1
+        - Name: Build
+          Actions:
+            - Name: Build
+              ActionTypeId:
+                Category: Build
+                Owner: AWS
+                Version: 1
+                Provider: CodeBuild
+              OutputArtifacts:
+                - Name: MyAppBuild
+              InputArtifacts:
+                - Name: MyApp
+              Configuration:
+                ProjectName: !Ref BGCodeBuildProject
+              RunOrder: 1
+        - Name: Deploy
+          Actions:
+            - Name: DeployApp
+              ActionTypeId:
+                Category: Deploy
+                Owner: AWS
+                Version: 1
+                Provider: CodeDeploy
+              InputArtifacts:
+                - Name: MyAppBuild
+              Configuration:
+                ApplicationName: !Ref MyApplication
+                DeploymentGroupName: 'my-sample-bg-deployment-group'
+              RunOrder: 1
+        - Name: Lambda
+          Actions:
+            - Name: MyLambdaAction
+              ActionTypeId:
+                Category: Invoke
+                Owner: AWS
+                Version: 1
+                Provider: Lambda
+              InputArtifacts:
+                - Name: MyAppBuild
+              Configuration:
+                FunctionName: !Ref Function1
+              RunOrder: 1  
+  CustomServiceRole:
+    Type: 'AWS::IAM::Role'
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          Effect: Allow
+          Principal:
+            Service:
+              - codepipeline.amazonaws.com
+              - codedeploy.amazonaws.com
+              - lambda.amazonaws.com
+              - codebuild.amazonaws.com
+          Action: 'sts:AssumeRole'
+      Path: /
+      ManagedPolicyArns:
+        - 'arn:aws:iam::aws:policy/AdministratorAccess'
+  BGCodeBuildProject:
+    Type: 'AWS::CodeBuild::Project'
+    Properties:
+      Artifacts:
+          ArtifactIdentifier: String
+          EncryptionDisabled: false
+          Location: !Ref ArtifactBucket
+          Name: "MyBuildArtifact"
+          NamespaceType: NONE
+          OverrideArtifactName: false
+          Path: ""
+          Type: CODEPIPELINE
+      Environment:
+        ComputeType: BUILD_GENERAL1_SMALL
+        Image: 'aws/codebuild/amazonlinux2-x86_64-standard:3.0'
+        Type: LINUX_CONTAINER
+        ImagePullCredentialsType: CODEBUILD
+        PrivilegedMode: true
+        EnvironmentVariables:
+            - Name: SSM_PARAMETER
+              Type: PLAINTEXT
+              Value: !Sub '${BasicParameter}'
+            - Name: REGION
+              Type: PLAINTEXT
+              Value: !Sub '${AWS::Region}'             
+            - Name: EFS_ID
+              Type: PLAINTEXT
+              Value: !Ref FileSystem   
+      VpcConfig:
+        SecurityGroupIds:
+         - Ref: WebServerSecurityGroup
+        Subnets:
+         -  Ref: PrivateSubnet1
+         -  Ref: PrivateSubnet2      
+        VpcId: !Ref VPC  
+      FileSystemLocations:
+       - Identifier: 'myefs'
+         Location: !Sub '${FileSystem}.efs.${AWS::Region}.amazonaws.com:/'
+         MountOptions: "nfsvers=4.1,rsize=1048576,wsize=1048576,hard,timeo=600,retrans=2"
+         MountPoint: '/efs'
+         Type: EFS       
+      ServiceRole: !Ref CustomServiceRole
+      Source:
+        Type: CODEPIPELINE          
+        Location: !Join 
+          - ''
+          - - 'https://git-codecommit.'
+            - !Ref 'AWS::Region'
+            - .amazonaws.com/v1/repos/
+            - !Ref 'AWS::StackName'
+  CreateDeploymentGroup:
+        Type: Custom::CreateDeploymentGroup
+        UpdateReplacePolicy : Retain
+        DependsOn: MyApplication
+        Properties:
+            ServiceToken: !GetAtt Function.Arn
+            serviceroleARN: !GetAtt CustomServiceRole.Arn
+            ApplicationName: !Ref MyApplication
+            DeploymentGroupName: 'my-sample-bg-deployment-group'
+            AutoScalingGroupName: !Ref WebServerGroup
+            TargetGroupName: !GetAtt ALBTargetGroup.TargetGroupName 
+            
+  Function:
+    Type: AWS::Lambda::Function
+    Properties:
+      Code:
+        ZipFile: |
+            import boto3
+            import json
+            import time
+            import random
+            import requests
+            from botocore.exceptions import ClientError
+            #from botocore.vendored import requests
+
+            codedeploy = boto3.client('codedeploy')
+            asg = boto3.client('autoscaling')
+            def main(event, context):
+              print("Recieved Event: {}".format(json.dumps(event)))
+              codedeployserviceRole_ARN = event['ResourceProperties']['serviceroleARN']
+              app_name = event['ResourceProperties']['ApplicationName']
+              deployment_group_name = event['ResourceProperties']['DeploymentGroupName']
+              asg_group_name = event['ResourceProperties']['AutoScalingGroupName']
+              target_group_name = event['ResourceProperties']['TargetGroupName']
+              try:
+                  if event['RequestType'] == 'Create':
+                      print("Recieved Create Event...")
+                      response = create_action(app_name, deployment_group_name, codedeployserviceRole_ARN, asg_group_name, target_group_name)
+                      sendResponse(event, context, response['deploymentGroupId'], 'SUCCESS', {})
+                  elif event['RequestType'] == 'Update':
+                      print("Recieved Update Event...")
+                      deployment_groups_names = codedeploy.list_deployment_groups(applicationName=app_name)
+                      old_asg_group_name = event['OldResourceProperties']['AutoScalingGroupName']
+                      cur_deployment_group_name = deployment_groups_names['deploymentGroups'][0]
+                      response = update_action(app_name, cur_deployment_group_name, deployment_group_name, codedeployserviceRole_ARN, asg_group_name, target_group_name)
+                      sendResponse(event, context, 'hello', 'SUCCESS', response)
+                      if old_asg_group_name != asg_group_name:
+                        print("deleting old ASG")
+                        asg.delete_auto_scaling_group(AutoScalingGroupName=old_asg_group_name,ForceDelete=True)
+                  elif event['RequestType'] == 'Delete':
+                      print("Recieved Delete Event...")
+                      try:
+                        deployment_group_detail = codedeploy.get_deployment_group(applicationName=app_name,deploymentGroupName=deployment_group_name)
+                        list_deploy_detail = codedeploy.list_deployments(applicationName=app_name,deploymentGroupName=deployment_group_name,includeOnlyStatuses=['Failed','Succeeded','Stopped'])
+                        i = 0
+                        for deployments in list_deploy_detail:
+                          depid = list_deploy_detail['deployments'][i]
+                          deploy_detail = codedeploy.get_deployment(deploymentId=depid)
+                          asgname = deploy_detail['deploymentInfo']['targetInstances']['autoScalingGroups'][0]
+                          print("Deleting Auto Scaling Group")
+                          asg.delete_auto_scaling_group(AutoScalingGroupName=asgname,ForceDelete=True)  
+                          i +=1     
+                      except IndexError:
+                          print("nothing to delete")                         
+                      deployment_group_id = deployment_group_detail['deploymentGroupInfo']['deploymentGroupId']
+                      response = delete_action(app_name, deployment_group_name)
+                      sendResponse(event, context, deployment_group_id , "SUCCESS", response)
+              except ClientError as e:
+                  if e.response['Error']['Code'] == 'ThrottlingException':
+                      count = 2
+                      attempts = 0
+                      while attempts < count:
+                          print("Retrying Function Execution....")
+                          time.sleep(random.expovariate(1))
+                          main(event,context)
+                          attempts += 1
+                  elif e.response['Error']['Code'] == 'DeploymentGroupDoesNotExistException':	
+                      sendResponse(event,context,'success',"SUCCESS",e.response)
+                  elif e.response['Error']['Code'] == 'ValidationError':	
+                      sendResponse(event,context,'success',"SUCCESS",e.response)
+                  elif e.response['Error']['Code'] == 'ResourceInUse':	
+                      sendResponse(event,context,'success',"SUCCESS",e.response)                      
+                  else:
+                      print("printing error")
+                      sendResponse(event,context,'failed',"FAILED",e.response)
+                  
+            def create_action(app_name, deployment_group_name, codedeployserviceRole_ARN, asg_group_name, target_group_name):
+              response = codedeploy.create_deployment_group(
+                applicationName=app_name,
+                deploymentGroupName=deployment_group_name,
+                deploymentConfigName='CodeDeployDefault.AllAtOnce',
+                autoScalingGroups=[
+                    asg_group_name,
+                ],
+                serviceRoleArn=codedeployserviceRole_ARN,
+                autoRollbackConfiguration={
+                    'enabled': True,
+                    'events': [
+                        'DEPLOYMENT_FAILURE',
+                    ]
+                },
+                deploymentStyle={
+                    'deploymentType': 'BLUE_GREEN',
+                    'deploymentOption': 'WITH_TRAFFIC_CONTROL'
+                },
+                blueGreenDeploymentConfiguration={
+                    'terminateBlueInstancesOnDeploymentSuccess': {
+                        'action': 'TERMINATE',
+                        'terminationWaitTimeInMinutes': 2
+                    },
+                    'deploymentReadyOption': {
+                        'actionOnTimeout': 'CONTINUE_DEPLOYMENT',
+                        'waitTimeInMinutes': 0
+                    },
+                    'greenFleetProvisioningOption': {
+                        'action': 'COPY_AUTO_SCALING_GROUP'
+                    }
+                },
+                loadBalancerInfo={
+                    'targetGroupInfoList': [
+                        {
+                            'name': target_group_name
+                        },
+                    ]
+                })
+              return response
+            def update_action(app_name, cur_deployment_group_name, deployment_group_name, codedeployserviceRole_ARN, asg_group_name, target_group_name):
+              response = codedeploy.update_deployment_group(applicationName=app_name,currentDeploymentGroupName=cur_deployment_group_name,
+                newDeploymentGroupName=deployment_group_name,
+                 autoScalingGroups=[
+                    asg_group_name,
+                ],
+                serviceRoleArn=codedeployserviceRole_ARN,
+                loadBalancerInfo={
+                    'targetGroupInfoList': [
+                        {
+                            'name': target_group_name
+                        },
+                    ]
+                })
+              return response
+            def delete_action(app_name, deployment_group_name):
+               print("Deleting CodeDeploy Deployment Group")
+               response = codedeploy.delete_deployment_group(applicationName=app_name,deploymentGroupName=deployment_group_name)
+               return  response
+            def sendResponse(event, context, physicalid, responseStatus, responseData):
+              responseBody = {'Status': responseStatus,
+                              'Reason': 'See the details in CloudWatch Log Stream: ' + context.log_stream_name,
+                              'PhysicalResourceId': physicalid,
+                              'StackId': event['StackId'],
+                              'RequestId': event['RequestId'],
+                              'LogicalResourceId': event['LogicalResourceId'],
+                              'NoEcho': "true",
+                              'Data': responseData}
+              print('RESPONSE BODY:n' + json.dumps(responseBody))
+              responseUrl = event['ResponseURL']
+              json_responseBody = json.dumps(responseBody)
+              headers = {
+                  'content-type' : '',
+                  'content-length' : str(len(json_responseBody))
+              }
+              try:
+               print("sending response")
+               response = requests.put(responseUrl,data=json_responseBody,headers=headers)
+              except Exception as e:
+                    print("send(..) failed executing requests.put(..): " + str(e)) 
+      Description: Custom Resource - Create CodeDeploy Deployment Group
+      Handler: index.main
+      MemorySize: 128
+      Role: !GetAtt CustomServiceRole.Arn
+      Runtime: python3.7
+      Timeout: 120
+  Function1:
+    Type: AWS::Lambda::Function
+    Properties:
+      Code:
+        ZipFile: |   
+         import json
+         import boto3
+         ssm = boto3.client("ssm")
+         def lambda_handler(event, context):
+            print(event)
+            codepipeline = boto3.client("codepipeline")
+            job_id = event["CodePipeline.job"]["id"]
+            try:
+                print("Checking current EFS directory name!")
+                parameter = ssm.get_parameter(Name="deployment", WithDecryption=False)
+                current_deployment = parameter["Parameter"]["Value"]
+                print(current_deployment)
+                if (parameter["Parameter"]["Value"]) == "green":
+                    ssm.put_parameter(Name="deployment", Value="blue", Type="String", Overwrite=True)
+                elif (parameter["Parameter"]["Value"]) == "blue":
+                    ssm.put_parameter(Name="deployment", Value="green", Type="String", Overwrite=True)
+                else:
+                    ssm.put_parameter(Name="deployment", Value="green", Type="String", Overwrite=True)
+                response = codepipeline.put_job_success_result(jobId=job_id)
+                print(response)
+            except Exception as error:
+                print(error)
+                response = codepipeline.put_job_failure_result(jobId=job_id, failureDetails={"type": "JobFailed","message": error})
+      Description: 'Lambda function to store deployment type in SSM paramter store'
+      Handler: index.lambda_handler
+      MemorySize: 128
+      Role: !GetAtt CustomServiceRole.Arn
+      Runtime: python3.7
+      Timeout: 60
+      
+Outputs:
+  VPCID:
+    Description: A reference to the created VPC
+    Value: !Ref VPC
+    Export:
+      Name: !Sub '${AWS::StackName}-VPC'   
+     
+  WebsiteURL:
+    Description: URL for newly created Website
+    Value:
+      Fn::Join:
+      - ''
+      - - http://
+        - Fn::GetAtt:
+          - ApplicationLoadBalancer
+          - DNSName
+  CodeCommitURL:
+    Description: CodeCommit URL
+    Value: !Join 
+      - ''
+      - - 'https://console.aws.amazon.com/codecommit/home?region='
+        - !Ref 'AWS::Region'
+        - '#/repository/'
+        - !Ref 'AWS::StackName'
+        - /browse/HEAD/--/
+  CodeDeployURL:
+    Description: CodeDeploy URL
+    Value: !Join 
+      - ''
+      - - 'https://console.aws.amazon.com/codedeploy/home?region='
+        - !Ref 'AWS::Region'
+        - '#/deployments/'
+  CodePipelineURL:
+    Description: CodePipeline URL
+    Value: !Join 
+      - ''
+      - - 'https://console.aws.amazon.com/codepipeline/home?region='
+        - !Ref 'AWS::Region'
+        - '#/view/'
+        - !Ref CodePipeline        

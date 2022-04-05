@@ -1,0 +1,122 @@
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  annotations:
+    eks.amazonaws.com/role-arn: {{ .Values.a2d2.serviceAccount.roleArn }}
+  name: {{ .Values.a2d2.serviceAccount.name }}
+  namespace: {{ .Values.global.namespace }}
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  namespace: {{ .Values.global.namespace }}
+  name: {{ .Values.a2d2.name }}
+  labels:
+    app.kubernetes.io/name: {{ .Values.a2d2.name }}
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    app.kubernetes.io/managed-by: {{ .Release.Service }}
+type: Opaque
+stringData:
+  config: |
+    {{ toJson .Values.configMap }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  namespace: {{ .Values.global.namespace }}
+  name: {{ .Values.a2d2.name }}
+  labels:
+    app: {{ .Values.a2d2.name }}
+spec:
+  replicas: {{ .Values.a2d2.replicaCount }}
+  selector:
+    matchLabels:
+      app: {{ .Values.a2d2.name }}
+  template:
+    metadata:
+      labels:
+        app: {{ .Values.a2d2.name }}
+    spec:
+      serviceAccountName: {{ .Values.a2d2.serviceAccount.name }}
+      volumes:
+      - name: config
+        secret:
+          secretName: {{ .Values.a2d2.name }}
+          items:
+          - key: config
+            mode: 400
+            path: {{ .Values.a2d2.config.path }}
+      - name: fsx
+        persistentVolumeClaim:
+           claimName: fsx-a2d2
+      - name: efs 
+        persistentVolumeClaim:
+           claimName: efs-a2d2
+      - name: tmp
+        emptyDir: {}
+      containers:
+      - name: {{ .Values.a2d2.name }} 
+        image: {{ .Values.a2d2.image.uri }} 
+        imagePullPolicy: {{ .Values.a2d2.image.policy }}
+        resources:
+          requests:
+            memory: {{ .Values.a2d2.requests.memory }} 
+            cpu: {{ .Values.a2d2.requests.cpu }} 
+        command:
+        - python
+        args:
+        - /mozart/ros_data_node.py
+        - --config
+        - {{ .Values.a2d2.config.dir }}/{{ .Values.a2d2.config.path }}
+        volumeMounts:
+        - mountPath: {{ .Values.a2d2.config.dir }}
+          name: config
+        - mountPath: /fsx
+          name: fsx
+        - mountPath: /efs
+          name: efs
+        - mountPath: /tmp
+          name: tmp
+---
+apiVersion: autoscaling/v2beta2
+kind: HorizontalPodAutoscaler
+metadata:
+  namespace: {{ .Values.global.namespace }}
+  name: {{ .Values.a2d2.name }}
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: {{ .Values.a2d2.name }}
+  minReplicas: {{ .Values.a2d2.replicaCount }} 
+  maxReplicas: {{ .Values.a2d2.maxReplicaCount }} 
+  metrics:
+  - type: Resource
+    resource:
+      name: {{ .Values.a2d2.metric.name }} 
+      target:
+        type: Utilization
+        averageUtilization: {{ .Values.a2d2.metric.average }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Values.a2d2.name }}
+  namespace: {{ .Values.global.namespace }}
+  annotations:
+    service.beta.kubernetes.io/aws-load-balancer-access-log-enabled: "false"
+    service.beta.kubernetes.io/aws-load-balancer-connection-draining-enabled: "false"
+    service.beta.kubernetes.io/aws-load-balancer-type: "nlb"
+    service.beta.kubernetes.io/aws-load-balancer-internal: "{{ .Values.rosbridge.internal }}"
+spec:
+  ports:
+  - protocol: TCP
+    port: {{ .Values.rosbridge.port }} 
+    targetPort:  {{ .Values.rosbridge.target_port }}
+  selector:
+    app: {{ .Values.a2d2.name }}
+  type: LoadBalancer
+  loadBalancerSourceRanges:
+  - {{ .Values.rosbridge.source_cidr }}
+

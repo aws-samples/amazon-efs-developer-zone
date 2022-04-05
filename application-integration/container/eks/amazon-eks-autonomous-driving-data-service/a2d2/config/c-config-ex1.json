@@ -1,0 +1,19 @@
+{
+	"delay": 0,
+	"servers": "<kafka broker servers>",
+	"requests": [{
+		"kafka_topic": "a2d2", 
+		"vehicle_id": "a2d2",
+		"scene_id": "20190401121727",
+		"sensor_id": ["bus", "lidar/front_left", "camera/front_left"],
+		"start_ts": 1554115465612291, 
+		"stop_ts": 1554115765612291,
+		"ros_topic": {"bus": "/a2d2/bus", "lidar/front_left": "/a2d2/lidar/front_left", 
+				"camera/front_left": "/a2d2/camera/front_left"},
+		"data_type": {"bus": "a2d2_msgs/Bus", "lidar/front_left": "sensor_msgs/PointCloud2",
+				"camera/front_left": "sensor_msgs/Image"},
+		"step": 1000000,
+		"accept": "fsx/multipart/rosbag",
+		"preview": true
+	}]
+}

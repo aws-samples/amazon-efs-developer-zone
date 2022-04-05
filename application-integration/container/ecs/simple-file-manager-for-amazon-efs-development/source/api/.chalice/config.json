@@ -1,0 +1,15 @@
+{
+  "version": "2.0",
+  "app_name": "api",
+  "environment_variables": {
+    "botoConfig": "{}",
+    "stackPrefix": ""
+  },
+  "stages": {
+    "dev": {
+      "manage_iam_role": false,
+      "iam_role_arn": "arn:aws:iam::999999999999:role/DummyRoleToBeReplaced",
+      "api_gateway_stage": "api"
+    }
+  }
+}

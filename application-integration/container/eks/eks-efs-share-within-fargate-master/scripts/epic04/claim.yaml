@@ -1,0 +1,14 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+   name: poc-app-pvc
+spec:
+   accessModes:
+      - ReadWriteMany
+   storageClassName: efs-sc
+   resources:
+      requests:
+         # Required field by Kubernetes.
+         # Can be any value since EFS is an elastic file system 
+         # it doesn't really enforce any file system capacity.
+         storage: 1Mi

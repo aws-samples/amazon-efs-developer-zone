@@ -1,0 +1,11 @@
+#!/bin/bash
+response=$(curl -s http://localhost/)
+
+if curl -I "http://localhost" 2>&1 | grep -w "200\|301" ; then
+    echo "application deployed successfully" >> /tmp/deploylog.txt
+	echo $response >> /tmp/deploylog.txt
+else
+    echo "application deployment failed" >> /tmp/deploylog.txt
+	echo $response >> /tmp/deploylog.txt
+	exit 1
+fi

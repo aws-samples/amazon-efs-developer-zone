@@ -1,0 +1,34 @@
+#!/bin/bash
+isExistApp = `pgrep httpd`
+if [[ -n  $isExistApp ]]; then
+    /bin/systemctl stop httpd.service       
+fi
+
+region=$(curl -s http://169.254.169.254/latest/meta-data/placement/region)
+CURRENT_DEPLOYMENT=$(aws ssm get-parameter --name "deployment" --region $region --query Parameter.Value --output text)
+DEPLOYMENT_TYPE=$(aws deploy get-deployment --deployment-id "$DEPLOYMENT_ID" --region $region --query deploymentInfo.deploymentStyle.deploymentType --output text)
+
+function deploy_to_green {
+echo `date -u` ":deploying to green" >> /tmp/deploylog.txt
+## here you can mention any commands you need to run for your application during the deployment
+}
+
+function deploy_to_blue {
+echo `date -u` ":deploying to BLUE" >> /tmp/deploylog.txt
+## here you can mention any commands you need to run for your application during the deployment
+}
+
+if [ "$DEPLOYMENT_TYPE" == "IN_PLACE" ]; then
+ echo `date -u` ":nothing to deploy as this is an ASG launch activity, EFS already uptodate" >> /tmp/deploylog.txt
+else
+ if [ "$CURRENT_DEPLOYMENT" == "green" ];then
+	 deploy_to_blue
+ elif [ "$CURRENT_DEPLOYMENT" == "blue" ] || [ "$CURRENT_DEPLOYMENT" == "null" ];then
+	 deploy_to_green
+ else
+  echo `date -u` ":nothing to deploy" >> /tmp/deploylog.txt
+ fi	
+fi
+
+/bin/systemctl restart httpd.service
+

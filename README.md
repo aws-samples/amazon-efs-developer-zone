@@ -122,6 +122,7 @@ In this section we will see how we can make an Amazon EFS file system accessed f
 | Tutorial | Link
 | --- | ---
 | **Amazon EFS with Amazon EC2 instances** | [![](img/efs-tutorial-button.png)](/application-integration/ec2/README.md) |
+| **Blue/Green deployment with AWS Developer tools on Amazon EC2 using Amazon EFS** | [![](img/efs-tutorial-button.png)](application-integration/ec2/blue-green-deployment-pipeline-for-efs) |
 
 ## Amazon EFS with Serverless  
 
@@ -132,6 +133,8 @@ In this section we will dive into how you can setup Amazon EFS with AWS Lambda a
 | **Amazon EFS with AWS Lambda and API Gateway** | [![](img/efs-tutorial-button.png)](/application-integration/serverless/efs-lambda-apigw) |
 | **Media file processing using AWS Lambda and Amazon EFS** | [![](img/efs-tutorial-button.png)](/application-integration/serverless/media-file-processing) |
 | **Machine Learning Inference using Amazon API Gateway, AWS Lambda and Amazon EFS** | [![](img/efs-tutorial-button.png)](https://github.com/aws-samples/ml-inference-using-aws-lambda-and-amazon-efs) |
+| **Zero administration inference with AWS Lambda for Huggingface** | [![](img/efs-tutorial-button.png)](/application-integration/serverless/ml-inference-with-aws-lambda-for-hugging-face/) |
+
 
 ## Amazon EFS with Container 
 
@@ -144,6 +147,19 @@ In this section we will dive into how you can setup Amazon EFS with Amazon ECS a
 | **Machine Learning at scale using Kubeflow on Amazon EKS with Amazon EFS** | [![](/img/efs-tutorial-button.png)](/application-integration/container/eks/kubeflow) |
 | **Building a cloud file manager using Amazon ECS(Fargate) and Amazon EFS** | [![](/img/efs-tutorial-button.png)](/application-integration/container/ecs/ecs-efs-demo/) |
 | **Bitcoin Blockchain with Amazon ECS and Amazon EFS** | [![](/img/efs-tutorial-button.png)](/application-integration/container/ecs/ecs-efs-bitcoin) |
+| **Persistence Configuration with Amazon EFS on Amazon EKS using AWS Fargate** | [![](/img/efs-tutorial-button.png)](/application-integration/container/eks/eks-efs-share-within-fargate-master) |
+
+## Solution powered by Amazon EFS 
+
+In this section we will dive into few of the solution which are powered by Amazon EFS and other AWS services 
+
+| Tutorial | Link
+| --- | ---
+| **Distributed TensorFlow training using Kubeflow on Amazon EKS** | [![](/img/efs-tutorial-button.png)](/application-integration/container/eks/amazon-eks-machine-learning-with-terraform-and-kubeflow) |
+| **Simple File Manager using AWS Lambda and Amazon EFS** | [![](/img/efs-tutorial-button.png)](application-integration/container/ecs/simple-file-manager-for-amazon-efs-development) |
+| **Scalable Big Blue Button Video Conference** | [![](/img/efs-tutorial-button.png)](application-integration/ec2/aws-scalable-big-blue-button-example) |
+| **Data Service for ADAS and ADS Development** | [![](/img/efs-tutorial-button.png)](application-integration/container/eks/amazon-eks-autonomous-driving-data-service) |
+
 
 
 ## AWS re:Invernt Sessions 

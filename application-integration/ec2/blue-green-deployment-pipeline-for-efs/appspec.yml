@@ -1,0 +1,16 @@
+version: 0.0
+os: linux
+hooks:
+  BeforeInstall:
+    - location: scripts/install_dependencies
+      timeout: 180
+      runas: root
+  AfterInstall:
+    - location: scripts/app_deployment
+      timeout: 180
+      runas: root
+  BeforeAllowTraffic :
+     - location: scripts/check_app_status
+       timeout: 180
+       runas: root        
+

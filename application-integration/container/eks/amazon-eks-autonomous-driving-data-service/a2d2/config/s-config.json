@@ -1,0 +1,27 @@
+{
+	"servers": "<kafka broker servers>",
+	"kafka_topic": "<name of kafka topic>",
+	"database": {
+		"dbname": "<redshift data base name>",
+		"host": "<redshift host>",
+		"port": "5439",
+		"user": "<redshift username>",
+		"password": "<redshift password>"
+	},
+	"data_store": {
+		"fsx": {
+			"root": "/fsx",
+			"rosbag": "/fsx/rosbag"
+		},
+		"s3": {
+			"rosbag_bucket": "<s3 bucket for rosbag files>",
+			"rosbag_prefix": "<s3 bucket prefix for rosbag files>"
+		},
+		"input": "fsx"
+	},
+	"max_response_tasks": 1,
+	"calibration": {
+		"cal_bucket": "",
+		"cal_key": "a2d2/cams_lidars.json"
+	}
+}

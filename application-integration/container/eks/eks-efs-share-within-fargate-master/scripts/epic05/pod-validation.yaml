@@ -1,0 +1,17 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: poc-app-validation
+spec:
+  containers:
+  - name: poc-app-validation
+    image: busybox
+    command: ["/bin/sh"]
+    args: ["-c", "while true; do sleep 60; done"]
+    volumeMounts:
+    - name: persistent-storage
+      mountPath: /data
+  volumes:
+  - name: persistent-storage
+    persistentVolumeClaim:
+      claimName: poc-app-validation-pvc

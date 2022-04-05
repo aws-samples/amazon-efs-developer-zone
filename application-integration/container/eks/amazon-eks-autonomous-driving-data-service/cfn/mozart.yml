@@ -1,0 +1,2332 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: >-
+  Mozart data service stack. The stack name is implicitly used as the name of the 
+  EKS cluster and the MSK cluster created by the stack.
+Parameters:
+  S3Bucket:
+    Description: S3 bucket name, which must be 3 to 63 characters long
+    Type: String
+    AllowedPattern: '[a-zA-Z0-9][a-zA-Z0-9-\.]{2,62}'
+
+  DesktopRemoteAccessCIDR:
+    Description: Remote access Ip V4 CIDR
+    AllowedPattern: '(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})/(\d{1,2})'
+    Type: String
+
+  VpcCIDR:
+    Default: 172.30.0.0/16
+    Description: (Advanced) Vpc CIDR. Do not use 192.168.0.0 range.
+    AllowedPattern: '(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})/(\d{1,2})'
+    Type: String
+
+  VpcPublicSubnet1CIDR:
+    Default: 172.30.0.0/24
+    Description: (Advanced) Public Subnet1 CIDR inside VpcCIDR
+    AllowedPattern: '(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})/(\d{1,2})'
+    Type: String
+
+  VpcPublicSubnet2CIDR:
+    Default: 172.30.1.0/24
+    Description: (Advanced) Public Subnet2 CIDR inside VpcCIDR
+    AllowedPattern: '(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})/(\d{1,2})'
+    Type: String
+
+  VpcPublicSubnet3CIDR:
+    Default: 172.30.2.0/24
+    Description: (Advanced)  Public Subnet3 CIDR inside VpcCIDR
+    AllowedPattern: '(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})/(\d{1,2})'
+    Type: String
+
+  VpcPrivateSubnet1CIDR:
+    Default: 172.30.64.0/18
+    Description: (Advanced)  Private Subnet1 CIDR inside VpcCIDR
+    AllowedPattern: '(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})/(\d{1,2})'
+    Type: String
+
+  VpcPrivateSubnet2CIDR:
+    Default: 172.30.128.0/18
+    Description: (Advanced)  Private Subnet2 CIDR inside VpcCIDR
+    AllowedPattern: '(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})/(\d{1,2})'
+    Type: String
+
+  VpcPrivateSubnet3CIDR:
+    Default: 172.30.192.0/18
+    Description: (Advanced)  Private Subnet2 CIDR inside VpcCIDR
+    AllowedPattern: '(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})/(\d{1,2})'
+    Type: String
+
+  RedshiftDatabaseName:
+    Description: Redshift database name
+    Type: String
+    Default: mozart
+    AllowedPattern: "([a-z]|[0-9])+"
+
+  RedshiftNumberOfNodes:
+    Description: The number of compute nodes in the Redshift cluster, must be >= 2
+    Type: Number
+    Default: 3
+    MinValue: 3
+
+  RedshiftNodeType:
+    Description: The type of node to be provisioned for Redshift cluster
+    Type: String
+    Default: ra3.4xlarge
+    AllowedValues:
+    - dc2.large
+    - ds2.xlarge
+    - ra3.4xlarge
+    - ra3.16xlarge
+
+  RedshiftMasterUsername:
+    Description: The user name that is associated with the master user account for
+      the Redshift cluster that is being created
+    Type: String
+    Default: admin 
+    AllowedPattern: "([a-z])([a-z]|[0-9])*"
+
+  RedshiftMasterUserPassword: 
+    AllowedPattern: "(?=^.{8,}$)(?=.*\\d)(?=.*[A-Z])(?=.*[a-z]).*$"
+    Description: "Resdhift master password: Atleast length 8, lower case, upper case and digits."
+    NoEcho: "true"
+    Type: String
+
+  RedshiftPortNumber:
+    Description: The port number on which the Redshift cluster accepts incoming connections.
+    Type: Number
+    Default: 5439
+
+  MSKBrokerNodeType:
+    Description: The type of node to be provisioned for MSK Broker
+    Type: String
+    Default: kafka.m5.2xlarge
+    AllowedValues:
+    - kafka.m5.large
+    - kafka.m5.2xlarge
+    - kafka.m5.4xlarge
+    
+  MSKNumberOfNodes:
+    Description: The number of MSK Broker nodes, must be >= 2
+    Type: Number
+    Default: 3
+    MinValue: 3
+
+  FSxStorageCapacityGiB:
+    Description: FSx Storage capacity in multiples of 2400 GiB
+    Type: Number
+    MinValue: 2400
+    Default: 7200
+
+  FSxS3ImportPrefix:
+    Description: (Optional) FSx S3 prefix for importing data
+    Type: String
+    AllowedPattern: '^(?!/)[a-zA-Z0-9-_\./]*'
+    Default: "a2d2"
+
+  EKSEncryptSecretsKmsKeyArn:
+    Description: Encrypt EKS Secrets Key ARN (Leave blank to create)
+    Type: String
+    Default: ""
+
+  KubernetesVersion:
+    Description: Kubernetes Version
+    Type: String
+    AllowedValues: [ "1.21" ]
+    Default: "1.21"
+
+  KubectlVersion:
+    Description: Kubectl Version
+    Type: String
+    AllowedValues: [ "1.21.2/2021-07-05" ]
+    Default: "1.21.2/2021-07-05"
+  
+  EKSNodeVolumeSizeGiB:
+    Description: EKS Node volume size GiB
+    Type: Number
+    MinValue: 200
+    Default: 200
+  
+  EKSNodeGroupMinSize:
+    Description: EKS Node group minimum size
+    Type: Number
+    MinValue: 1
+    Default: 1
+  
+  EKSNodeGroupMaxSize:
+    Description: EKS Node group maximum size
+    Type: Number
+    MinValue: 2
+    Default: 10
+  
+  EKSNodeGroupDesiredSize:
+    Description: EKS Node group desired size
+    Type: Number
+    MinValue: 1
+    Default: 2
+
+  EKSNodeGroupInstanceType:
+    Description: EKS Node group instance type
+    Type: String
+    Default: "r5n.8xlarge"
+    AllowedValues:
+    - m5n.2xlarge
+    - m5n.4xlarge
+    - m5n.8xlarge
+    - r5n.8xlarge
+    - r5n.12xlarge
+    - r5n.16xlarge
+    - r5n.24xlarge
+  
+  UbuntuAMI:
+    Description: >-
+      Advanced option to override Ubuntu AMI with version 18.04, or 20.04. 
+      ROS  'melodic' requires 18.04, and 'noetic' requires 20.04.
+    Type: String
+    AllowedPattern: '(ami-[0-9a-z]{17})?'
+
+  DesktopInstanceType:
+    Description: >-
+     EC2 instance type for desktop.
+    Type: String
+    Default: g4dn.xlarge
+    AllowedValues:
+      - m5n.xlarge
+      - m5n.2xlarge
+      - m5n.4xlarge
+      - g3s.xlarge
+      - g3.4xlarge
+      - g3.8xlarge
+      - g3.16xlarge
+      - g4dn.xlarge
+      - g4dn.2xlarge
+      - g4dn.4xlarge
+      - g4dn.8xlarge
+      - g4dn.12xlarge
+      - g4dn.16xlarge
+     
+    ConstraintDescription: Must be a valid GPU EC2 instance type.
+  
+  DesktopEbsVolumeSize:
+    Description: Desktop EBS volume size (GiB) 
+    Type: Number
+    MinValue: 200
+    Default: 200
+
+  DesktopEbsVolumeType:
+    Default: 'gp3'
+    Description: Desktop EBS volume type
+    Type: String
+    AllowedValues:
+      - 'gp2'
+      - 'gp3'
+
+  KeyPairName:
+    Description: EC2 SSH KeyPair Name
+    Type: 'AWS::EC2::KeyPair::KeyName'
+    AllowedPattern: '^[\x00-\x7F]{1,255}[^.\s]$'
+
+  DesktopHasPublicIpAddress:
+    Description: Should a Public Ip Address be associated with the Desktop?
+    Type: String
+    Default: "true"
+    AllowedValues:
+     - "true"
+     - "false"
+
+  RosVersion:
+    Description: >-
+     ROS version. 
+    Type: String
+    Default: "noetic"
+    AllowedValues:
+     - "melodic"
+     - "noetic"
+  
+  FargateComputeMax:
+    Description: Maximum size of compute environment in vCpus
+    Type: Number
+    Default: 1024
+  
+  FargateComputeType:
+    Description: Fargate compute type
+    Type: String
+    Default: "FARGATE_SPOT"
+    AllowedValues:
+      - "FARGATE_SPOT"
+      - "FARGATE"
+       
+
+Conditions:
+  CreateEksKey: !Equals [ !Ref EKSEncryptSecretsKmsKeyArn, "" ]
+  OverrideAMI: !Not 
+    - !Equals 
+      - !Ref UbuntuAMI
+      - ''
+
+Mappings:
+  melodic:
+    us-east-1:
+      AMI: ami-052474ad05a707726
+    us-east-2:
+      AMI: ami-0766d84b731e45cb6 
+    us-west-2:
+      AMI: ami-07e00b8a1a054fdbf 
+    eu-west-1:
+      AMI: ami-02174249e65e06bea 
+    eu-central-1:
+      AMI: ami-0d4f8a81cb29d4e3f 
+    ap-southeast-1:
+      AMI: ami-06c1196e3aefdb899 
+    ap-southeast-2:
+      AMI: ami-0ff9d71ef519ffd29 
+    ap-south-1:
+      AMI: ami-0f326447840c78c9a 
+    ap-northeast-1:
+      AMI: ami-075558eae9ec402e1 
+    ap-northeast-2:
+      AMI: ami-07fdae2b415bf7289
+  noetic:
+    us-east-1:
+      AMI: ami-0514b4bd87dba7384
+    us-east-2:
+      AMI: ami-05117a5348bb8a291
+    us-west-2:
+      AMI: ami-0f09d704ce46e6a2b
+    eu-west-1:
+      AMI: ami-03c13f269af7966ed 
+    eu-central-1:
+      AMI: ami-0bcce4ca0396fb05b 
+    ap-southeast-1:
+      AMI: ami-0fc6c5e9cea99b19a 
+    ap-southeast-2:
+      AMI: ami-027f8e873ea62233a
+    ap-south-1:
+      AMI: ami-095fd2eba69d252b2 
+    ap-northeast-1:
+      AMI: ami-05704132ab024395d
+    ap-northeast-2:
+      AMI: ami-0944342c546cdb378
+
+Resources:
+  Vpc:
+    Type: 'AWS::EC2::VPC'
+    Properties:
+      CidrBlock: !Ref VpcCIDR
+      EnableDnsSupport: true
+      EnableDnsHostnames: true
+      Tags:
+        - Key: Name
+          Value: !Sub '${AWS::StackName}-data-service'
+  InternetGateway:
+    Type: 'AWS::EC2::InternetGateway'
+    Properties:
+      Tags:
+        - Key: Network
+          Value: Public
+        - Key: Name
+          Value: !Ref 'AWS::StackName'
+  GatewayToInternet:
+    Type: 'AWS::EC2::VPCGatewayAttachment'
+    Properties:
+      VpcId: !Ref Vpc
+      InternetGatewayId: !Ref InternetGateway
+  PublicSubnet1:
+    Type: 'AWS::EC2::Subnet'
+    Properties:
+      VpcId: !Ref Vpc
+      AvailabilityZone: 
+        Fn::Select: 
+          - 0
+          - Fn::GetAZs: ""
+      CidrBlock: !Ref VpcPublicSubnet1CIDR
+      MapPublicIpOnLaunch: false
+      Tags:
+        - Key: Network
+          Value: Public
+        - Key: Name
+          Value: !Ref 'AWS::StackName'
+        - Key: 'kubernetes.io/role/elb'
+          Value: '1'
+        - Key: !Sub 'kubernetes.io/cluster/${AWS::StackName}'
+          Value: 'shared'
+  PublicSubnet2:
+    Type: 'AWS::EC2::Subnet'
+    Properties:
+      VpcId: !Ref Vpc
+      AvailabilityZone: 
+        Fn::Select: 
+          - 1
+          - Fn::GetAZs: ""
+      CidrBlock: !Ref VpcPublicSubnet2CIDR
+      MapPublicIpOnLaunch: false
+      Tags:
+        - Key: Network
+          Value: Public
+        - Key: Name
+          Value: !Ref 'AWS::StackName'
+        - Key: 'kubernetes.io/role/elb'
+          Value: '1'
+        - Key: !Sub 'kubernetes.io/cluster/${AWS::StackName}'
+          Value: 'shared'
+  PublicSubnet3:
+    Type: 'AWS::EC2::Subnet'
+    Properties:
+      VpcId: !Ref Vpc
+      AvailabilityZone: 
+        Fn::Select: 
+          - 2
+          - Fn::GetAZs: ""
+      CidrBlock: !Ref VpcPublicSubnet3CIDR
+      MapPublicIpOnLaunch: false
+      Tags:
+        - Key: Network
+          Value: Public
+        - Key: Name
+          Value: !Ref 'AWS::StackName'
+        - Key: 'kubernetes.io/role/elb'
+          Value: '1'
+        - Key: !Sub 'kubernetes.io/cluster/${AWS::StackName}'
+          Value: 'shared'
+  PrivateSubnet1:
+    Type: 'AWS::EC2::Subnet'
+    Properties:
+      VpcId: !Ref Vpc
+      AvailabilityZone: 
+        Fn::Select: 
+          - 0
+          - Fn::GetAZs: ""
+      CidrBlock: !Ref VpcPrivateSubnet1CIDR
+      Tags:
+        - Key: Network
+          Value: Private
+        - Key: Name
+          Value: !Ref 'AWS::StackName'
+        - Key: 'kubernetes.io/role/internal-elb'
+          Value: '1'
+        - Key: !Sub 'kubernetes.io/cluster/${AWS::StackName}'
+          Value: 'shared'
+  PrivateSubnet2:
+    Type: 'AWS::EC2::Subnet'
+    Properties:
+      VpcId: !Ref Vpc
+      AvailabilityZone: 
+        Fn::Select: 
+          - 1
+          - Fn::GetAZs: ""
+      CidrBlock: !Ref VpcPrivateSubnet2CIDR
+      Tags:
+        - Key: Network
+          Value: Private
+        - Key: Name
+          Value: !Ref 'AWS::StackName'
+        - Key: 'kubernetes.io/role/internal-elb'
+          Value: '1'
+        - Key: !Sub 'kubernetes.io/cluster/${AWS::StackName}'
+          Value: 'shared'
+  PrivateSubnet3:
+    Type: 'AWS::EC2::Subnet'
+    Properties:
+      VpcId: !Ref Vpc
+      AvailabilityZone: 
+        Fn::Select: 
+          - 2
+          - Fn::GetAZs: ""
+      CidrBlock: !Ref VpcPrivateSubnet3CIDR
+      Tags:
+        - Key: Network
+          Value: Private
+        - Key: Name
+          Value: !Ref 'AWS::StackName'
+        - Key: 'kubernetes.io/role/internal-elb'
+          Value: '1'
+        - Key: !Sub 'kubernetes.io/cluster/${AWS::StackName}'
+          Value: 'shared'
+  NATGatewayEIP:
+    Type: 'AWS::EC2::EIP'
+    Properties:
+      Domain: vpc
+  NATGateway:
+    Type: 'AWS::EC2::NatGateway'
+    DependsOn: GatewayToInternet
+    Properties:
+      AllocationId: !GetAtt 
+        - NATGatewayEIP
+        - AllocationId
+      SubnetId: !Ref PublicSubnet1
+  PublicRouteTable:
+    Type: 'AWS::EC2::RouteTable'
+    DependsOn: GatewayToInternet
+    Properties:
+      VpcId: !Ref Vpc
+      Tags:
+        - Key: Network
+          Value: Public
+        - Key: Name
+          Value: !Ref 'AWS::StackName'
+  PublicRoute:
+    Type: 'AWS::EC2::Route'
+    Properties:
+      RouteTableId: !Ref PublicRouteTable
+      DestinationCidrBlock: 0.0.0.0/0
+      GatewayId: !Ref InternetGateway
+  PublicSubnet1RouteAssociation:
+    Type: 'AWS::EC2::SubnetRouteTableAssociation'
+    DependsOn: [ PublicRoute ]
+    Properties:
+      SubnetId: !Ref PublicSubnet1
+      RouteTableId: !Ref PublicRouteTable
+  PublicSubnet2RouteAssociation:
+    Type: 'AWS::EC2::SubnetRouteTableAssociation'
+    DependsOn: [ PublicRoute ]
+    Properties:
+      SubnetId: !Ref PublicSubnet2
+      RouteTableId: !Ref PublicRouteTable
+  PublicSubnet3RouteAssociation:
+    Type: 'AWS::EC2::SubnetRouteTableAssociation'
+    DependsOn: [ PublicRoute ]
+    Properties:
+      SubnetId: !Ref PublicSubnet3
+      RouteTableId: !Ref PublicRouteTable
+  PrivateRouteTable:
+    Type: 'AWS::EC2::RouteTable'
+    Properties:
+      VpcId: !Ref Vpc
+      Tags:
+        - Key: Network
+          Value: Private
+        - Key: Name
+          Value: !Ref 'AWS::StackName'
+  PrivateRoute:
+    Type: 'AWS::EC2::Route'
+    Properties:
+      RouteTableId: !Ref PrivateRouteTable
+      DestinationCidrBlock: 0.0.0.0/0
+      NatGatewayId: !Ref NATGateway
+  PrivatePeeringRoute:
+    Type: 'AWS::EC2::Route'
+    Properties:
+      RouteTableId: !Ref PrivateRouteTable
+      DestinationCidrBlock: "192.168.0.0/23"
+      VpcPeeringConnectionId: !Ref BatchFargateVpcPeering
+
+  PrivateSubnet1RouteAssociation:
+    Type: 'AWS::EC2::SubnetRouteTableAssociation'
+    DependsOn: [ PrivateRoute ]
+    Properties:
+      SubnetId: !Ref PrivateSubnet1
+      RouteTableId: !Ref PrivateRouteTable
+  PrivateSubnet2RouteAssociation:
+    Type: 'AWS::EC2::SubnetRouteTableAssociation'
+    DependsOn: [ PrivateRoute ]
+    Properties:
+      SubnetId: !Ref PrivateSubnet2
+      RouteTableId: !Ref PrivateRouteTable
+  PrivateSubnet3RouteAssociation:
+    Type: 'AWS::EC2::SubnetRouteTableAssociation'
+    DependsOn: [ PrivateRoute ]
+    Properties:
+      SubnetId: !Ref PrivateSubnet3
+      RouteTableId: !Ref PrivateRouteTable
+  VpcS3Endpoint:
+    Type: AWS::EC2::VPCEndpoint
+    Properties:
+      PolicyDocument: 
+        Version: 2012-10-17
+        Statement: 
+          - Effect: "Allow"
+            Principal: "*"
+            Action: 
+              - "s3:Get*"
+              - "s3:List*"
+              - "s3:PutObject*"
+              - "s3:DeleteObject*"
+            Resource: "*"
+      RouteTableIds:
+        - !Ref PrivateRouteTable
+        - !Ref PublicRouteTable
+      ServiceName: !Sub com.amazonaws.${AWS::Region}.s3
+      VpcId: !Ref Vpc
+  VpcEcrApiEndpoint:
+    Type: AWS::EC2::VPCEndpoint
+    Properties:
+      SubnetIds:
+        - Ref: PrivateSubnet1
+        - Ref: PrivateSubnet2
+        - Ref: PrivateSubnet3
+      PolicyDocument: 
+        Version: 2012-10-17
+        Statement: 
+          - Effect: "Allow"
+            Principal: "*"
+            Action: 
+              - "ecr:*"
+            Resource: "*"
+      ServiceName: !Sub com.amazonaws.${AWS::Region}.ecr.api
+      VpcEndpointType: 'Interface'
+      VpcId: !Ref Vpc
+  VpcEcrDkrEndpoint:
+    Type: AWS::EC2::VPCEndpoint
+    Properties:
+      SubnetIds:
+        - Ref: PrivateSubnet1
+        - Ref: PrivateSubnet2
+        - Ref: PrivateSubnet3
+      PolicyDocument: 
+        Version: 2012-10-17
+        Statement: 
+          - 
+            Effect: "Allow"
+            Principal: "*"
+            Action: 
+              - "ecr:*"
+            Resource: "*"
+      ServiceName: !Sub com.amazonaws.${AWS::Region}.ecr.dkr
+      VpcEndpointType: 'Interface'
+      VpcId: !Ref Vpc
+  VpcSecretsManagerEndpoint:
+    Type: AWS::EC2::VPCEndpoint
+    Properties:
+      SubnetIds:
+        - Ref: PrivateSubnet1
+        - Ref: PrivateSubnet2
+        - Ref: PrivateSubnet3
+      PolicyDocument: 
+        Version: 2012-10-17
+        Statement: 
+          - 
+            Effect: "Allow"
+            Principal: "*"
+            Action: 
+              - "secretsmanager:*"
+            Resource: "*"
+      ServiceName: !Sub com.amazonaws.${AWS::Region}.secretsmanager
+      VpcEndpointType: 'Interface'
+      VpcId: !Ref Vpc
+  VpcSecurityGroup:
+    Type: 'AWS::EC2::SecurityGroup'
+    Properties:
+      GroupDescription: VPC security group
+      VpcId: !Ref Vpc
+      Tags:
+        - Key: Name
+          Value: !Ref 'AWS::StackName'
+  VpcSecurityGroupIngressFSx1: 
+    Type: 'AWS::EC2::SecurityGroupIngress'
+    Properties:
+      Description: Ingress from within the VPC security group for FSx
+      GroupId: !GetAtt VpcSecurityGroup.GroupId
+      IpProtocol: tcp
+      FromPort: 988
+      ToPort: 988
+      SourceSecurityGroupId: !GetAtt VpcSecurityGroup.GroupId
+  VpcSecurityGroupCIDRIngressFSx1: 
+    Type: 'AWS::EC2::SecurityGroupIngress'
+    Properties:
+      Description: Ingress from within the VPC security group CIDR for FSx
+      GroupId: !GetAtt VpcSecurityGroup.GroupId
+      CidrIp: !Ref VpcCIDR
+      IpProtocol: tcp
+      FromPort: 988
+      ToPort: 988
+  VpcSecurityGroupIngressFSx2: 
+    Type: 'AWS::EC2::SecurityGroupIngress'
+    Properties:
+      Description: Ingress from within the VPC security group for FSx
+      GroupId: !GetAtt VpcSecurityGroup.GroupId
+      IpProtocol: tcp
+      FromPort: 1021
+      ToPort: 1023
+      SourceSecurityGroupId: !GetAtt VpcSecurityGroup.GroupId
+  VpcSecurityGroupCIDRIngressFSx2: 
+    Type: 'AWS::EC2::SecurityGroupIngress'
+    Properties:
+      Description: Ingress from within the VPC security group CIDR for FSx
+      GroupId: !GetAtt VpcSecurityGroup.GroupId
+      CidrIp: !Ref VpcCIDR
+      IpProtocol: tcp
+      FromPort: 1021
+      ToPort: 1023
+  VpcSecurityGroupIngressEfs: 
+    Type: 'AWS::EC2::SecurityGroupIngress'
+    Properties:
+      Description: Ingress from within the VPC security group for Efs
+      GroupId: !GetAtt VpcSecurityGroup.GroupId
+      IpProtocol: tcp
+      FromPort: 2049
+      ToPort: 2049
+      SourceSecurityGroupId: !GetAtt VpcSecurityGroup.GroupId
+  VpcSecurityGroupCIDRIngressEfs: 
+    Type: 'AWS::EC2::SecurityGroupIngress'
+    Properties:
+      Description: Ingress from within the VPC security group CIDR for Efs
+      GroupId: !GetAtt VpcSecurityGroup.GroupId
+      CidrIp: !Ref VpcCIDR
+      IpProtocol: tcp
+      FromPort: 2049
+      ToPort: 2049
+  VpcSecurityGroupIngressRosBridge: 
+    Type: 'AWS::EC2::SecurityGroupIngress'
+    Properties:
+      Description: Ingress from within the VPC security group for Ros bridge
+      GroupId: !GetAtt VpcSecurityGroup.GroupId
+      IpProtocol: tcp
+      FromPort: 9090
+      ToPort: 9090
+      SourceSecurityGroupId: !GetAtt VpcSecurityGroup.GroupId
+  VpcSecurityGroupCIDRIngressRosBridge: 
+    Type: 'AWS::EC2::SecurityGroupIngress'
+    Properties:
+      Description: Ingress from within the VPC security group CIDR for Ros bridge
+      GroupId: !GetAtt VpcSecurityGroup.GroupId
+      CidrIp: !Ref VpcCIDR
+      IpProtocol: tcp
+      FromPort: 9090
+      ToPort: 9090
+  VpcSecurityGroupCIDREgress: 
+    Type: 'AWS::EC2::SecurityGroupEgress'
+    Properties:
+      Description: Egress rule for out bound traffic
+      GroupId: !GetAtt VpcSecurityGroup.GroupId
+      IpProtocol: tcp
+      FromPort: 0
+      ToPort: 65535
+      CidrIp: '0.0.0.0/0'
+
+  DesktopSecurityGroup:
+    Type: 'AWS::EC2::SecurityGroup'
+    Properties:
+      GroupDescription: Desktop security group
+      VpcId: !Ref Vpc
+      Tags:
+        - Key: Name
+          Value: !Ref 'AWS::StackName'
+
+  DesktopSecurityGroupCIDRIngress1: 
+    Type: 'AWS::EC2::SecurityGroupIngress'
+    Properties:
+      Description: Ingress from CIDR for NICE-DCV access to graphics desktop
+      GroupId: !GetAtt DesktopSecurityGroup.GroupId
+      CidrIp: !Ref DesktopRemoteAccessCIDR
+      IpProtocol: tcp
+      FromPort: 8443
+      ToPort: 8443
+
+  DesktopSecurityGroupCIDRIngress2: 
+    Type: 'AWS::EC2::SecurityGroupIngress'
+    Properties:
+      Description: Ingress from CIDR for SSH access to graphics desktop
+      GroupId: !GetAtt DesktopSecurityGroup.GroupId
+      CidrIp: !Ref DesktopRemoteAccessCIDR
+      IpProtocol: tcp
+      FromPort: 22
+      ToPort: 22
+
+  DesktopSecurityGroupCIDREgress: 
+    Type: 'AWS::EC2::SecurityGroupEgress'
+    Properties:
+      Description: Egress rule for out bound traffic
+      GroupId: !GetAtt DesktopSecurityGroup.GroupId
+      IpProtocol: tcp
+      FromPort: 0
+      ToPort: 65535
+      CidrIp: '0.0.0.0/0'
+
+  RedshiftClusterRole:
+    Type: "AWS::IAM::Role"
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: redshift.amazonaws.com
+            Action: 
+              - "sts:AssumeRole"
+      Policies:
+        - PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Effect: Allow
+                Action: 
+                  - "s3:GetObject"
+                  - "s3:ListBucket"
+                Resource:
+                  - !Sub 'arn:aws:s3:::${S3Bucket}'
+                  - !Sub 'arn:aws:s3:::${S3Bucket}/*'
+          PolicyName: 'RedshiftClusterPolicy'
+
+  RedshiftMasterUserPasswordSecret:
+    Type: AWS::SecretsManager::Secret
+    Properties: 
+      Description: "Redshift database master user password"
+      SecretString: 
+        !Ref RedshiftMasterUserPassword
+
+  RedshiftCluster:
+    Type: AWS::Redshift::Cluster
+    DependsOn: [PrivateSubnet1RouteAssociation, PrivateSubnet2RouteAssociation, PrivateSubnet3RouteAssociation]
+    Properties:
+      ClusterType: 'multi-node'
+      Encrypted: true
+      NumberOfNodes: !Ref RedshiftNumberOfNodes
+      NodeType:
+        Ref: RedshiftNodeType
+      DBName:
+        Ref: RedshiftDatabaseName
+      MasterUsername:
+        Ref: RedshiftMasterUsername
+      MasterUserPassword:
+        Ref: RedshiftMasterUserPassword
+      ClusterParameterGroupName:
+        Ref: RedshiftClusterParameterGroup
+      VpcSecurityGroupIds:
+      - Ref: RedshiftSecurityGroup
+      ClusterSubnetGroupName:
+        Ref: RedshiftClusterSubnetGroup
+      PubliclyAccessible: false
+      Port:
+        Ref: RedshiftPortNumber
+      IamRoles:
+        - !GetAtt RedshiftClusterRole.Arn
+
+  RedshiftClusterParameterGroup:
+    Type: AWS::Redshift::ClusterParameterGroup
+    Properties:
+      Description: Redshift Cluster parameter group
+      ParameterGroupFamily: redshift-1.0
+      Parameters:
+      - ParameterName: enable_user_activity_logging
+        ParameterValue: 'true'
+
+  RedshiftClusterSubnetGroup:
+    Type: AWS::Redshift::ClusterSubnetGroup
+    Properties:
+      Description: Redshift Cluster subnet group
+      SubnetIds:
+      - Ref: PrivateSubnet1
+      - Ref: PrivateSubnet2
+      - Ref: PrivateSubnet3
+
+  RedshiftSecurityGroup:
+    DependsOn: [VpcSecurityGroup]
+    Type: 'AWS::EC2::SecurityGroup'
+    Properties:
+      GroupDescription: Redshift Security group
+      VpcId: !Ref Vpc
+      Tags:
+        - Key: Name
+          Value: !Ref 'AWS::StackName'
+
+  RedshiftSecurityGroupIngress: 
+    Type: 'AWS::EC2::SecurityGroupIngress'
+    Properties:
+      Description: Ingress from  VPC security group to RedShift database
+      GroupId: !GetAtt RedshiftSecurityGroup.GroupId
+      IpProtocol: tcp
+      FromPort: !Ref RedshiftPortNumber
+      ToPort: !Ref RedshiftPortNumber
+      SourceSecurityGroupId: !GetAtt VpcSecurityGroup.GroupId
+
+  RedshiftSecurityGroupBatchFargateIngress: 
+    Type: 'AWS::EC2::SecurityGroupIngress'
+    Properties:
+      Description: Ingress from batch fargate VPC security group to RedShift database
+      GroupId: !GetAtt RedshiftSecurityGroup.GroupId
+      IpProtocol: tcp
+      FromPort: !Ref RedshiftPortNumber
+      ToPort: !Ref RedshiftPortNumber
+      SourceSecurityGroupId: !GetAtt BatchFargateSecurityGroup.GroupId
+
+  RedshiftSecurityGroupCIDRIngress: 
+    Type: 'AWS::EC2::SecurityGroupIngress'
+    Properties:
+      Description: Ingress from from  VPC CIDR to RedShift database
+      GroupId: !GetAtt RedshiftSecurityGroup.GroupId
+      CidrIp: !Ref VpcCIDR
+      IpProtocol: tcp
+      FromPort: !Ref RedshiftPortNumber
+      ToPort: !Ref RedshiftPortNumber
+  
+  RedshiftSecurityGroupCIDREgress: 
+    Type: 'AWS::EC2::SecurityGroupEgress'
+    Properties:
+      Description: Egress rule for out bound traffic
+      GroupId: !GetAtt RedshiftSecurityGroup.GroupId
+      IpProtocol: tcp
+      FromPort: 0
+      ToPort: 65535
+      CidrIp: '0.0.0.0/0'
+
+  MSKClusterLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub "${AWS::StackName}-msk"
+      RetentionInDays: 30
+
+  MSKCluster:
+    Type: 'AWS::MSK::Cluster'
+    DependsOn: [PrivateSubnet1RouteAssociation, PrivateSubnet2RouteAssociation, PrivateSubnet3RouteAssociation]
+    Properties:
+      ClusterName: !Sub '${AWS::StackName}'
+      KafkaVersion: 2.2.1
+      NumberOfBrokerNodes: !Ref MSKNumberOfNodes
+      LoggingInfo:
+        BrokerLogs: 
+          CloudWatchLogs:
+            Enabled: true
+            LogGroup: !Ref MSKClusterLogGroup
+      EncryptionInfo:
+        EncryptionInTransit:
+          ClientBroker: "TLS_PLAINTEXT"
+          InCluster: false
+      BrokerNodeGroupInfo:
+        InstanceType: !Ref MSKBrokerNodeType
+        ClientSubnets:
+          - Ref: PrivateSubnet1
+          - Ref: PrivateSubnet2
+          - Ref: PrivateSubnet3
+        SecurityGroups:
+          - Ref: MSKSecurityGroup
+
+  MSKSecurityGroup:
+    DependsOn: [VpcSecurityGroup]
+    Type: 'AWS::EC2::SecurityGroup'
+    Properties:
+      GroupDescription: MSK Security group
+      VpcId: !Ref Vpc
+      Tags:
+        - Key: Name
+          Value: !Ref 'AWS::StackName'
+
+  MSKSecurityGroupIngress: 
+    Type: 'AWS::EC2::SecurityGroupIngress'
+    Properties:
+      Description: Ingress from VPC security group to MSK cluster endpoint
+      GroupId: !GetAtt MSKSecurityGroup.GroupId
+      IpProtocol: tcp
+      FromPort: 9092
+      ToPort: 9094
+      SourceSecurityGroupId: !GetAtt VpcSecurityGroup.GroupId
+  
+  MSKSecurityGroupCIDRIngress: 
+    Type: 'AWS::EC2::SecurityGroupIngress'
+    Properties:
+      Description: Ingress from VPC CIDR to MSK cluster endpoint
+      GroupId: !GetAtt MSKSecurityGroup.GroupId
+      CidrIp: !Ref VpcCIDR
+      IpProtocol: tcp
+      FromPort: 9092
+      ToPort: 9094
+
+  MSKSecurityGroupCIDREgress: 
+    Type: 'AWS::EC2::SecurityGroupEgress'
+    Properties:
+      Description: Egress rule for out bound traffic
+      GroupId: !GetAtt MSKSecurityGroup.GroupId
+      IpProtocol: tcp
+      FromPort: 0
+      ToPort: 65535
+      CidrIp: '0.0.0.0/0'
+
+  EksControlPlaneRole:
+    Type: "AWS::IAM::Role"
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: 
+              - eks.amazonaws.com
+              - ec2.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+          - !Sub 'arn:${AWS::Partition}:iam::aws:policy/AmazonEKSClusterPolicy'
+          - !Sub 'arn:${AWS::Partition}:iam::aws:policy/AmazonEKSServicePolicy'
+  
+  KMSKey:
+    Condition: CreateEksKey
+    Type: "AWS::KMS::Key"
+    Properties:
+      EnableKeyRotation: true
+      KeyPolicy: {
+        "Version": "2012-10-17",
+        "Id": "key-default-1",
+        "Statement": [
+          {
+            "Sid": "Enable IAM User Permissions",
+            "Effect": "Allow",
+            "Principal": {
+              "AWS": !Sub "arn:${AWS::Partition}:iam::${AWS::AccountId}:root"
+            },
+            "Action": "kms:*",
+            "Resource": "*"
+          }
+        ]
+      }
+
+  EksControlPlane:
+    Type: "AWS::EKS::Cluster"
+    DependsOn: [PrivateSubnet1RouteAssociation, PrivateSubnet2RouteAssociation, PrivateSubnet3RouteAssociation]
+    Properties:
+      Name: !Ref AWS::StackName
+      ResourcesVpcConfig:
+        SecurityGroupIds: 
+        - !GetAtt VpcSecurityGroup.GroupId
+        SubnetIds:
+        - Ref: PrivateSubnet1
+        - Ref: PrivateSubnet2
+        - Ref: PrivateSubnet3
+      EncryptionConfig: 
+        - Resources: [ secrets ]
+          Provider:
+            KeyArn: !If [ CreateEksKey, !GetAtt KMSKey.Arn, !Ref EKSEncryptSecretsKmsKeyArn ]
+      RoleArn: !GetAtt EksControlPlaneRole.Arn
+      Version: !Ref KubernetesVersion
+
+  EksNodeRole:
+    Type: "AWS::IAM::Role"
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: ec2.amazonaws.com
+            Action: 
+              - "sts:AssumeRole"
+      Policies:
+        - PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Effect: Allow
+                Action: 
+                  - "autoscaling:DescribeAutoScalingGroups"
+                  - "autoscaling:DescribeAutoScalingInstances"
+                  - "autoscaling:DescribeLaunchConfigurations"
+                  - "autoscaling:DescribeTags"
+                  - "autoscaling:SetDesiredCapacity"
+                  - "autoscaling:TerminateInstanceInAutoScalingGroup"
+                  - "ec2:DescribeLaunchTemplateVersions"
+                Resource: '*'
+          PolicyName: 'EKSNodeAutoScalerPolicy'
+        - PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Effect: Allow
+                Action: 
+                  - "iam:CreateServiceLinkedRole"
+                Resource:  "*"
+                Condition:
+                  StringLike:
+                    iam:AWSServiceName:
+                      - "fsx.amazonaws.com"
+              - Effect: Allow
+                Action: 
+                  - "iam:CreateServiceLinkedRole"
+                  - "iam:AttachRolePolicy"
+                  - "iam:PutRolePolicy"
+                Resource:  "arn:aws:iam::*:role/aws-service-role/s3.data-source.lustre.fsx.amazonaws.com/*"
+              - Effect: Allow
+                Action:
+                  - "s3:ListBucket"
+                Resource: '*'
+              - Effect: Allow
+                Action:
+                  - "fsx:CreateFileSystem"
+                  - "fsx:DeleteFileSystem"
+                  - "fsx:DescribeFileSystems"
+                  - "fsx:TagResource"
+                Resource:  "*"
+          PolicyName: 'EKSNodeFSxCNIPolicy'
+      ManagedPolicyArns:
+        - !Sub "arn:${AWS::Partition}:iam::aws:policy/AmazonEKSWorkerNodePolicy"
+        - !Sub "arn:${AWS::Partition}:iam::aws:policy/AmazonEKS_CNI_Policy"
+        - !Sub "arn:${AWS::Partition}:iam::aws:policy/AmazonEC2ContainerRegistryReadOnly"
+      Path: /
+
+  EksPodServiceAccountRole:
+    Type: "AWS::IAM::Role"
+    Properties:
+      AssumeRolePolicyDocument: !Sub
+          - |
+            {
+              "Version": "2012-10-17",
+              "Statement": [
+                {
+                  "Effect": "Allow",
+                  "Principal": {
+                    "Federated": "arn:aws:iam::${AWS::AccountId}:oidc-provider/${ClusterOIDCPath}"
+                  },
+                  "Action": "sts:AssumeRoleWithWebIdentity",
+                  "Condition": {
+                    "StringEquals": {
+                      "${ClusterOIDCPath}:aud": "sts.amazonaws.com"
+                    }
+                  }
+                }
+              ]
+            }   
+          - ClusterOIDCPath: !Join 
+            - ''
+            - - 'oidc.eks.'
+              - !Ref 'AWS::Region'
+              - '.amazonaws.com/id/'
+              - !Select [0, !Split ['.', !Select [1, !Split ['//', !GetAtt EksControlPlane.Endpoint]]]]     
+      Policies:
+        - PolicyName: 'eks-sa-role-poliicy'
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Effect: Allow
+                Action: 
+                  - "s3:Get*"
+                  - "s3:List*"
+                  - "s3:PutObject*"
+                  - "s3:DeleteObject*"
+                Resource:
+                  - !Sub 'arn:aws:s3:::${S3Bucket}'
+                  - !Sub 'arn:aws:s3:::${S3Bucket}/*'
+        - PolicyName: eks-pod-secretsmanager-policy
+          PolicyDocument:
+            Statement:
+              - Effect: Allow
+                Action:
+                  - "secretsmanager:GetSecretValue"
+                Resource:
+                  - !Ref RedshiftMasterUserPasswordSecret
+
+  EKSNodeGroupPrivate:
+    Type: AWS::EKS::Nodegroup
+    Properties: 
+      AmiType: "AL2_x86_64"
+      ClusterName: !Ref EksControlPlane
+      DiskSize: !Ref EKSNodeVolumeSizeGiB
+      InstanceTypes: 
+      - !Ref EKSNodeGroupInstanceType
+      NodegroupName: 'private-nodegroup'
+      NodeRole: !GetAtt EksNodeRole.Arn
+      RemoteAccess:
+        Ec2SshKey: !Ref KeyPairName
+      ScalingConfig: 
+          DesiredSize: !Ref EKSNodeGroupDesiredSize
+          MaxSize: !Ref EKSNodeGroupMaxSize
+          MinSize: !Ref EKSNodeGroupMinSize
+      Labels:
+        nodegroup: 'mozart-data-service'
+      Subnets: 
+      - Ref: PrivateSubnet1
+      - Ref: PrivateSubnet2
+      - Ref: PrivateSubnet3
+  
+  EksClusterAutoscalerServiceAccountRole:
+    Type: "AWS::IAM::Role"
+    Properties:
+      AssumeRolePolicyDocument: !Sub
+          - |
+            {
+              "Version": "2012-10-17",
+              "Statement": [
+                {
+                  "Effect": "Allow",
+                  "Principal": {
+                    "Federated": "arn:aws:iam::${AWS::AccountId}:oidc-provider/${ClusterOIDCPath}"
+                  },
+                  "Action": "sts:AssumeRoleWithWebIdentity",
+                  "Condition": {
+                    "StringEquals": {
+                      "${ClusterOIDCPath}:aud": "sts.amazonaws.com"
+                    }
+                  }
+                }
+              ]
+            }   
+          - ClusterOIDCPath: !Join 
+            - ''
+            - - 'oidc.eks.'
+              - !Ref 'AWS::Region'
+              - '.amazonaws.com/id/'
+              - !Select [0, !Split ['.', !Select [1, !Split ['//', !GetAtt EksControlPlane.Endpoint]]]]     
+      Policies:
+        - PolicyName: 'eks-autoscaler-sa-role-poliicy'
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Effect: Allow
+                Action: 
+                  - "autoscaling:DescribeAutoScalingGroups"
+                  - "autoscaling:DescribeAutoScalingInstances"
+                  - "autoscaling:DescribeLaunchConfigurations"
+                  - "autoscaling:DescribeTags"
+                  - "autoscaling:SetDesiredCapacity"
+                  - "autoscaling:TerminateInstanceInAutoScalingGroup"
+                  - "ec2:DescribeLaunchTemplateVersions"
+                Resource:
+                  - '*'
+
+  FSxFileSystem:
+    Type: AWS::FSx::FileSystem
+    DependsOn: [ PrivateSubnet1RouteAssociation, VpcSecurityGroupIngressFSx1, VpcSecurityGroupIngressFSx2]
+    Properties: 
+      FileSystemType: 'LUSTRE'
+      LustreConfiguration: 
+        ImportPath: !Sub 's3://${S3Bucket}/${FSxS3ImportPrefix}'
+        DeploymentType: SCRATCH_2
+        ImportedFileChunkSize: 512000
+        AutoImportPolicy: "NEW_CHANGED"
+      SecurityGroupIds: 
+        - !GetAtt VpcSecurityGroup.GroupId
+      StorageCapacity: !Ref FSxStorageCapacityGiB
+      StorageType: 'SSD'
+      SubnetIds: 
+        - Ref: PrivateSubnet1
+      Tags:
+        - Key: Name
+          Value: !Ref 'AWS::StackName'
+  EFSFileSystem:
+    Type: 'AWS::EFS::FileSystem'
+    DeletionPolicy: Delete
+    UpdateReplacePolicy: Delete
+    Properties:
+      Encrypted : true
+      PerformanceMode: generalPurpose
+      FileSystemTags:
+        - Key: Name
+          Value: !Sub '${AWS::StackName}-data-service'
+  MountTarget1:
+    Type: 'AWS::EFS::MountTarget'
+    DependsOn: [ PrivateSubnet1RouteAssociation, VpcSecurityGroupIngressEfs ]
+    Properties:
+      FileSystemId:  !Ref EFSFileSystem
+      SubnetId: !Ref PrivateSubnet1
+      SecurityGroups:
+        - !Ref VpcSecurityGroup
+  MountTarget2:
+    Type: 'AWS::EFS::MountTarget'
+    DependsOn: [ PrivateSubnet2RouteAssociation, VpcSecurityGroupIngressEfs ]
+    Properties:
+      FileSystemId: !Ref EFSFileSystem 
+      SubnetId: !Ref PrivateSubnet2
+      SecurityGroups:
+        - !Ref VpcSecurityGroup
+  MountTarget3:
+    Type: 'AWS::EFS::MountTarget'
+    DependsOn: [ PrivateSubnet3RouteAssociation, VpcSecurityGroupIngressEfs ]
+    Properties:
+      FileSystemId: !Ref EFSFileSystem 
+      SubnetId: !Ref PrivateSubnet3
+      SecurityGroups:
+        - !Ref VpcSecurityGroup
+
+  GlueJobRole:
+    Type: "AWS::IAM::Role"
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: 
+                - glue.amazonaws.com
+            Action: 
+              - "sts:AssumeRole"
+      ManagedPolicyArns:
+        - 'arn:aws:iam::aws:policy/service-role/AWSGlueServiceRole'
+      Policies:
+        - PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Effect: Allow
+                Action: 
+                  - "s3:Get*"
+                  - "s3:List*"
+                  - "s3:PutObject*"
+                Resource:
+                  - !Sub 'arn:aws:s3:::${S3Bucket}'
+                  - !Sub 'arn:aws:s3:::${S3Bucket}/*'
+          PolicyName: 'glue-job-role-s3-poliicy'
+  
+  BatchFargateVpc:
+    Type: 'AWS::EC2::VPC'
+    Properties:
+      CidrBlock: "192.168.0.0/23"
+      EnableDnsSupport: true
+      EnableDnsHostnames: true
+      Tags:
+        - Key: Name
+          Value: !Sub '${AWS::StackName}-batch-fargate'
+  
+  BatchFargateVpcPeering:
+    Type: AWS::EC2::VPCPeeringConnection
+    Properties:
+      PeerVpcId: !Ref Vpc
+      VpcId: !Ref BatchFargateVpc
+
+  BatchFargateInternetGateway:
+    Type: 'AWS::EC2::InternetGateway'
+    Properties:
+      Tags:
+        - Key: Network
+          Value: Public
+        - Key: Name
+          Value: !Ref 'AWS::StackName'
+  BatchFargateGatewayToInternet:
+    Type: 'AWS::EC2::VPCGatewayAttachment'
+    Properties:
+      VpcId: !Ref BatchFargateVpc
+      InternetGatewayId: !Ref BatchFargateInternetGateway
+  BatchFargatePublicSubnet:
+    Type: 'AWS::EC2::Subnet'
+    Properties:
+      VpcId: !Ref BatchFargateVpc
+      AvailabilityZone: 
+        Fn::Select: 
+          - 0
+          - Fn::GetAZs: ""
+      CidrBlock: "192.168.0.0/24"
+  BatchFargatePublicRouteTable:
+    Type: 'AWS::EC2::RouteTable'
+    DependsOn: BatchFargateGatewayToInternet
+    Properties:
+      VpcId: !Ref BatchFargateVpc
+      Tags:
+        - Key: Network
+          Value: Public
+        - Key: Name
+          Value: !Ref 'AWS::StackName'
+  BatchFargatePublicRoute:
+    Type: 'AWS::EC2::Route'
+    Properties:
+      RouteTableId: !Ref BatchFargatePublicRouteTable
+      DestinationCidrBlock: 0.0.0.0/0
+      GatewayId: !Ref BatchFargateInternetGateway
+  BatchFargatePublicSubnetRouteAssociation:
+    Type: 'AWS::EC2::SubnetRouteTableAssociation'
+    DependsOn: [ BatchFargatePublicRoute ]
+    Properties:
+      SubnetId: !Ref BatchFargatePublicSubnet
+      RouteTableId: !Ref BatchFargatePublicRouteTable
+
+  BatchFargatePrivateSubnet:
+    Type: 'AWS::EC2::Subnet'
+    Properties:
+      VpcId: !Ref BatchFargateVpc
+      AvailabilityZone: 
+        Fn::Select: 
+          - 0
+          - Fn::GetAZs: ""
+      CidrBlock: "192.168.1.0/24"
+  BatchFargateNATGatewayEIP:
+    Type: 'AWS::EC2::EIP'
+    Properties:
+      Domain: vpc
+  BatchFargateNATGateway:
+    Type: 'AWS::EC2::NatGateway'
+    DependsOn: BatchFargateGatewayToInternet
+    Properties:
+      AllocationId: !GetAtt 
+        - BatchFargateNATGatewayEIP
+        - AllocationId
+      SubnetId: !Ref BatchFargatePublicSubnet
+  BatchFargatePrivateRouteTable:
+    Type: 'AWS::EC2::RouteTable'
+    Properties:
+      VpcId: !Ref BatchFargateVpc
+      Tags:
+        - Key: Network
+          Value: Private
+        - Key: Name
+          Value: !Ref 'AWS::StackName'
+  BatchFargatePrivateRoute:
+    Type: 'AWS::EC2::Route'
+    Properties:
+      RouteTableId: !Ref BatchFargatePrivateRouteTable
+      DestinationCidrBlock: 0.0.0.0/0
+      NatGatewayId: !Ref BatchFargateNATGateway
+  
+  BatchFargatePrivatePeeringRoute:
+    Type: 'AWS::EC2::Route'
+    Properties:
+      RouteTableId: !Ref BatchFargatePrivateRouteTable
+      DestinationCidrBlock: !Ref VpcCIDR
+      VpcPeeringConnectionId: !Ref BatchFargateVpcPeering
+
+  BatchFargatePrivateSubnetRouteAssociation:
+    Type: 'AWS::EC2::SubnetRouteTableAssociation'
+    DependsOn: [ BatchFargatePrivateRoute ]
+    Properties:
+      SubnetId: !Ref BatchFargatePrivateSubnet
+      RouteTableId: !Ref BatchFargatePrivateRouteTable
+  
+  
+
+  BatchFargateSecurityGroup:
+    Type: 'AWS::EC2::SecurityGroup'
+    Properties:
+      GroupDescription: Batch Fargate security group
+      VpcId: !Ref BatchFargateVpc
+      Tags:
+        - Key: Name
+          Value: !Ref 'AWS::StackName'
+  BatchFargateSecurityGroupIngress: 
+    Type: 'AWS::EC2::SecurityGroupIngress'
+    Properties:
+      Description: Ingress from within the VPC security group
+      GroupId: !GetAtt BatchFargateSecurityGroup.GroupId
+      IpProtocol: tcp
+      FromPort: 2049
+      ToPort: 2049
+      SourceSecurityGroupId: !GetAtt BatchFargateSecurityGroup.GroupId
+  BatchFargateSecurityGroupCIDREgress: 
+    Type: 'AWS::EC2::SecurityGroupEgress'
+    Properties:
+      Description: Egress rule for out bound traffic
+      GroupId: !GetAtt BatchFargateSecurityGroup.GroupId
+      IpProtocol: tcp
+      FromPort: 0
+      ToPort: 65535
+      CidrIp: '0.0.0.0/0'
+  
+  BatchFargateEcrApiEndpoint:
+    Type: AWS::EC2::VPCEndpoint
+    Properties:
+      SubnetIds:
+        - Ref: BatchFargatePrivateSubnet
+      PolicyDocument: 
+        Version: 2012-10-17
+        Statement: 
+          - Effect: "Allow"
+            Principal: "*"
+            Action: 
+              - "ecr:*"
+            Resource: "*"
+      ServiceName: !Sub com.amazonaws.${AWS::Region}.ecr.api
+      VpcEndpointType: 'Interface'
+      VpcId: !Ref BatchFargateVpc
+  BatchFargateEcrDkrEndpoint:
+    Type: AWS::EC2::VPCEndpoint
+    Properties:
+      SubnetIds:
+        - Ref: BatchFargatePrivateSubnet
+      PolicyDocument: 
+        Version: 2012-10-17
+        Statement: 
+          - Effect: "Allow"
+            Principal: "*"
+            Action: 
+              - "ecr:*"
+            Resource: "*"
+      ServiceName: !Sub com.amazonaws.${AWS::Region}.ecr.dkr
+      VpcEndpointType: 'Interface'
+      VpcId: !Ref BatchFargateVpc
+  BatchFargateEcsEndpoint:
+    Type: AWS::EC2::VPCEndpoint
+    Properties:
+      SubnetIds:
+        - Ref: BatchFargatePrivateSubnet
+      PolicyDocument: 
+        Version: 2012-10-17
+        Statement: 
+          - Effect: "Allow"
+            Principal: "*"
+            Action: 
+              - "ecs:*"
+            Resource: "*"
+      ServiceName: !Sub com.amazonaws.${AWS::Region}.ecs
+      VpcEndpointType: 'Interface'
+      VpcId: !Ref BatchFargateVpc
+  BatchFargateEcsAgentEndpoint:
+    Type: AWS::EC2::VPCEndpoint
+    Properties:
+      SubnetIds:
+        - Ref: BatchFargatePrivateSubnet
+      PolicyDocument: 
+        Version: 2012-10-17
+        Statement: 
+          - Effect: "Allow"
+            Principal: "*"
+            Action: 
+              - "ecs:*"
+            Resource: "*"
+      ServiceName: !Sub com.amazonaws.${AWS::Region}.ecs-agent
+      VpcEndpointType: 'Interface'
+      VpcId: !Ref BatchFargateVpc
+  BatchFargateEcsTelemetryEndpoint:
+    Type: AWS::EC2::VPCEndpoint
+    Properties:
+      SubnetIds:
+        - Ref: BatchFargatePrivateSubnet
+      PolicyDocument: 
+        Version: 2012-10-17
+        Statement: 
+          - Effect: "Allow"
+            Principal: "*"
+            Action: 
+              - "ecs:*"
+            Resource: "*"
+      ServiceName: !Sub com.amazonaws.${AWS::Region}.ecs-telemetry
+      VpcEndpointType: 'Interface'
+      VpcId: !Ref BatchFargateVpc
+  BatchFargateSecretsManagerEndpoint:
+    Type: AWS::EC2::VPCEndpoint
+    Properties:
+      SubnetIds:
+        - Ref: BatchFargatePrivateSubnet
+      PolicyDocument: 
+        Version: 2012-10-17
+        Statement: 
+          - 
+            Effect: "Allow"
+            Principal: "*"
+            Action: 
+              - "secretsmanager:*"
+            Resource: "*"
+      ServiceName: !Sub com.amazonaws.${AWS::Region}.secretsmanager
+      VpcEndpointType: 'Interface'
+      VpcId: !Ref BatchFargateVpc
+
+  BatchFargateEfsFileSystem:
+    Type: 'AWS::EFS::FileSystem'
+    DeletionPolicy: Delete
+    UpdateReplacePolicy: Delete
+    Properties:
+      Encrypted : true
+      PerformanceMode: generalPurpose
+      FileSystemTags:
+        - Key: Name
+          Value: !Sub '${AWS::StackName}-batch-fargate'
+
+  BatchFargateEfsAccessPoint:
+    Type: AWS::EFS::AccessPoint
+    Properties: 
+      FileSystemId: !Ref BatchFargateEfsFileSystem
+  BatchFargateMountTarget:
+    Type: 'AWS::EFS::MountTarget'
+    DependsOn: [ BatchFargatePrivateSubnetRouteAssociation, BatchFargateSecurityGroupIngress ]
+    Properties:
+      FileSystemId:  !Ref BatchFargateEfsFileSystem
+      SubnetId: !Ref BatchFargatePrivateSubnet
+      SecurityGroups:
+        - !Ref BatchFargateSecurityGroup
+
+  BatchServiceRole:
+    Type: "AWS::IAM::Role"
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: 
+                - batch.amazonaws.com
+            Action: 
+              - "sts:AssumeRole"
+      ManagedPolicyArns:
+        - 'arn:aws:iam::aws:policy/service-role/AWSBatchServiceRole'
+  
+  BatchExecutionRole:
+    Type: "AWS::IAM::Role"
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: 
+                - ecs-tasks.amazonaws.com
+            Action: 
+              - "sts:AssumeRole"
+      ManagedPolicyArns:
+        - 'arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy'
+      Policies:
+        - PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Effect: Allow
+                Action: 
+                  - "elasticfilesystem:ClientMount"
+                  - "elasticfilesystem:ClientWrite"
+                Resource: 
+                  - !GetAtt BatchFargateEfsFileSystem.Arn
+                Condition:
+                  StringEquals:
+                    "elasticfilesystem:AccessPointArn": !GetAtt BatchFargateEfsAccessPoint.Arn
+          PolicyName: 'batch-execution-efs-policy'
+  
+  StepFunctionsRole:
+    Type: "AWS::IAM::Role"
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: 
+                - states.amazonaws.com
+            Action: 
+              - "sts:AssumeRole"
+      ManagedPolicyArns:
+        - 'arn:aws:iam::aws:policy/AmazonEventBridgeFullAccess'
+      Policies:
+        - PolicyName: steps-batch-policy
+          PolicyDocument:
+            Statement:
+              - Effect: Allow
+                Action:
+                  - "batch:SubmitJob"
+                Resource:
+                  - !Ref FargateJobQueue
+                  - !Sub 'arn:aws:batch:${AWS::Region}:${AWS::AccountId}:job-definition/*'
+              - Effect: Allow
+                Action:
+                  - "batch:DescribeJobs"
+                Resource:
+                  - "*"
+  BatchJobRole:
+    Type: "AWS::IAM::Role"
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: 
+                - ecs-tasks.amazonaws.com
+            Action: 
+              - "sts:AssumeRole"
+      Policies:
+        - PolicyName: 'batch-job-s3-policy'
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Effect: Allow
+                Action: 
+                  - "s3:Get*"
+                  - "s3:List*"
+                  - "s3:PutObject*"
+                  - "s3:DeleteObject*"
+                Resource: 
+                  - !Sub 'arn:aws:s3:::${S3Bucket}'
+                  - !Sub 'arn:aws:s3:::${S3Bucket}/*'
+              - Effect: Allow
+                Action: 
+                  - "s3:Get*"
+                  - "s3:List*"
+                Resource: 
+                  - 'arn:aws:s3:::aev-autonomous-driving-dataset'
+                  - 'arn:aws:s3:::aev-autonomous-driving-dataset/*'
+        - PolicyName: batch-job-batch-policy
+          PolicyDocument:
+            Statement:
+              - Effect: Allow
+                Action:
+                  - "batch:SubmitJob"
+                Resource:
+                  - !Ref FargateJobQueue
+                  - !Sub 'arn:aws:batch:${AWS::Region}:${AWS::AccountId}:job-definition/*'
+              - Effect: Allow
+                Action:
+                  - "batch:DescribeJobs"
+                Resource:
+                  - "*"
+        - PolicyName: batch-job-glue-policy
+          PolicyDocument:
+            Statement:
+              - Effect: Allow
+                Action:
+                  - "glue:CreateJob"
+                  - "glue:StartJobRun"
+                  - "glue:GetJob*"
+                Resource:
+                  - "*"
+              - Effect: Allow
+                Action:
+                  - iam:PassRole
+                Resource:
+                  - !GetAtt GlueJobRole.Arn
+        - PolicyName: batch-job-secretsmanager-policy
+          PolicyDocument:
+            Statement:
+              - Effect: Allow
+                Action:
+                  - "secretsmanager:GetSecretValue"
+                Resource:
+                  - !Ref RedshiftMasterUserPasswordSecret
+
+  FargateComputeEnvironment:
+    Type: AWS::Batch::ComputeEnvironment
+    Properties:
+      ComputeEnvironmentName: !Sub '${AWS::StackName}-fargate'
+      Type: MANAGED
+      State: ENABLED
+      ComputeResources:
+        Type: !Ref FargateComputeType
+        MaxvCpus: !Ref FargateComputeMax
+        Subnets: 
+          - !Ref BatchFargatePrivateSubnet
+        SecurityGroupIds:
+          - !GetAtt BatchFargateSecurityGroup.GroupId
+
+      ServiceRole: !GetAtt BatchServiceRole.Arn
+      Tags:
+        Name: !Ref AWS::StackName
+  FargateJobQueue:
+    Type: AWS::Batch::JobQueue
+    Properties: 
+      JobQueueName: !Sub '${AWS::StackName}-fargate'
+      ComputeEnvironmentOrder: 
+        - Order: 1
+          ComputeEnvironment: !Ref FargateComputeEnvironment
+      Priority: 1
+      State: ENABLED
+  PythonFromS3JobDefinition:
+    Type: AWS::Batch::JobDefinition
+    Properties: 
+      JobDefinitionName: !Sub '${AWS::StackName}-pythonfroms3'
+      Type: container
+      PlatformCapabilities: 
+        - FARGATE
+      ContainerProperties:
+        Image: !Sub '${AWS::AccountId}.dkr.ecr.${AWS::Region}.amazonaws.com/pythonfroms3:focal'
+        FargatePlatformConfiguration:
+          PlatformVersion: "1.4.0"
+        ExecutionRoleArn: !GetAtt BatchExecutionRole.Arn
+        JobRoleArn: !GetAtt BatchJobRole.Arn
+        ResourceRequirements:
+          - Type: "VCPU"
+            Value: "4"
+          - Type: "MEMORY"
+            Value: "8192"
+        Volumes:
+          - EfsVolumeConfiguration:
+              FileSystemId: !Ref BatchFargateEfsFileSystem
+              AuthorizationConfig:
+                AccessPointId: !Ref BatchFargateEfsAccessPoint
+                Iam: "ENABLED"
+              RootDirectory: "/"
+              TransitEncryption: "ENABLED"
+            Name: "efs"
+        MountPoints:
+          - ContainerPath: "/efs"
+            SourceVolume: "efs"
+            
+  DesktopRole:
+    Type: "AWS::IAM::Role"
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: 
+                - ec2.amazonaws.com
+            Action: 
+              - "sts:AssumeRole"
+      ManagedPolicyArns:
+        - "arn:aws:iam::aws:policy/AmazonFSxReadOnlyAccess"
+      Policies:
+        - PolicyName: desktop-cloudformation-policy
+          PolicyDocument:
+            Statement:
+              - Effect: Allow
+                Action:
+                  - 'cloudformation:DescribeStacks'
+                Resource: 
+                  - !Sub 'arn:aws:cloudformation:::stack/${AWS::StackName}/*'
+
+        - PolicyName: desktop-fsx-policy
+          PolicyDocument:
+            Statement:
+              - Effect: Allow
+                Action:
+                  - 'fsx:DescribeFileSystems'
+                Resource:
+                  - !Sub 'arn:aws:fsx:::file-system/${FSxFileSystem}'
+
+        - PolicyName: desktop-kafka-policy
+          PolicyDocument:
+            Statement:
+              - Effect: Allow
+                Action:
+                - "kafka:DescribeCluster"
+                - "kafka:DescribeConfiguration"
+                - "kafka:DescribeConfigurationRevision"
+                - "kafka:CreateConfiguration"
+                - "kafka:UpdateClusterConfiguration"
+                - "kafka:GetBootstrapBrokers"
+                Resource:
+                  - "*"
+              
+        - PolicyName: desktop-batch-policy
+          PolicyDocument:
+            Statement:
+              - Effect: Allow
+                Action:
+                  - "batch:SubmitJob"
+                Resource:
+                  - !Ref FargateJobQueue
+                  - !Sub 'arn:aws:batch:${AWS::Region}:${AWS::AccountId}:job-definition/*'
+              - Effect: Allow
+                Action:
+                  - "batch:DescribeJobs"
+                Resource:
+                  - "*"
+
+        - PolicyName: desktop-sfn-policy
+          PolicyDocument:
+            Statement:
+              - Effect: Allow
+                Action:
+                  - states:CreateStateMachine
+                  - states:StartExecution
+                  - states:StopExecution
+                  - states:DescribeStateMachine*
+                  - states:DescribeExecution
+                  - states:ListStateMachines
+                  - states:ListExecutions
+                Resource:
+                  - '*'
+              - Effect: Allow
+                Action:
+                  - iam:PassRole
+                Resource:
+                  - !GetAtt StepFunctionsRole.Arn
+
+        - PolicyName: desktop-ecr-policy
+          PolicyDocument:
+            Statement:
+              - Effect: Allow
+                Action:
+                  - "ecr:GetAuthorizationToken"
+                  - "ecr:BatchCheckLayerAvailability"
+                  - "ecr:GetDownloadUrlForLayer"
+                  - "ecr:GetRepositoryPolicy"
+                  - "ecr:DescribeRepositories"
+                  - "ecr:ListImages"
+                  - "ecr:DescribeImages"
+                  - "ecr:BatchGetImage"
+                  - "ecr:InitiateLayerUpload"
+                  - "ecr:UploadLayerPart"
+                  - "ecr:CompleteLayerUpload"
+                  - "ecr:PutImage"
+                  - "ecr:CreateRepository"
+                Resource: "*"
+                
+        - PolicyName: desktop-dcv-license-s3
+          PolicyDocument:
+            Statement:
+              - Effect: Allow
+                Action:
+                  - 's3:GetObject'
+                Resource: 
+                  - !Sub 'arn:aws:s3:::dcv-license.${AWS::Region}/*'
+
+        - PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Effect: Allow
+                Action: 
+                  - "s3:Get*"
+                  - "s3:List*"
+                  - "s3:PutObject*"
+                  - "s3:DeleteObject*"
+                Resource: 
+                  - !Sub 'arn:aws:s3:::${S3Bucket}'
+                  - !Sub 'arn:aws:s3:::${S3Bucket}/*'
+              - Effect: Allow
+                Action: 
+                  - "s3:Get*"
+                  - "s3:List*"
+                Resource: 
+                  - 'arn:aws:s3:::aev-autonomous-driving-dataset'
+                  - 'arn:aws:s3:::aev-autonomous-driving-dataset/*'
+          PolicyName: 'DesktopS3Policy'
+
+  DesktopInstanceProfile: 
+    Type: "AWS::IAM::InstanceProfile"
+    Properties: 
+      Path: "/"
+      Roles: 
+        - Ref: "DesktopRole"
+  
+  DesktopInstance:
+    Type: 'AWS::EC2::Instance'
+    Properties:
+      ImageId: !If 
+        - OverrideAMI
+        - !Ref UbuntuAMI
+        - !FindInMap 
+          - !Ref RosVersion
+          - !Ref 'AWS::Region'
+          - AMI
+      InstanceType: !Ref DesktopInstanceType
+      EbsOptimized: true
+      IamInstanceProfile: !Ref DesktopInstanceProfile
+      BlockDeviceMappings:
+        - DeviceName: "/dev/sda1"
+          Ebs:
+            VolumeSize: !Ref DesktopEbsVolumeSize
+            VolumeType: !Ref DesktopEbsVolumeType
+            Encrypted: true
+            DeleteOnTermination: true
+      NetworkInterfaces: 
+      - AssociatePublicIpAddress: !Ref DesktopHasPublicIpAddress
+        DeviceIndex: "0"
+        GroupSet: 
+          - !Ref DesktopSecurityGroup
+        SubnetId: !Ref PublicSubnet1
+    
+      KeyName: !Ref KeyPairName
+      Tags: 
+        - Key: "Name"
+          Value: !Sub '${AWS::StackName}-desktop'
+
+      UserData:
+        Fn::Base64:
+          !Sub |
+              Content-Type: multipart/mixed; boundary="//"
+              MIME-Version: 1.0
+
+              --//
+              Content-Type: text/cloud-config; charset="us-ascii"
+              MIME-Version: 1.0
+              Content-Transfer-Encoding: 7bit
+              Content-Disposition: attachment; filename="cloud-config.txt"
+
+              #cloud-config
+              cloud_final_modules:
+              - [scripts-user, always]
+
+              --//
+              Content-Type: text/x-shellscript; charset="us-ascii"
+              MIME-Version: 1.0
+              Content-Transfer-Encoding: 7bit
+              Content-Disposition: attachment; filename="userdata.txt"
+
+              #!/bin/bash -xe
+
+              if [[ -f "/etc/systemd/system/dcvsession.service" ]]
+              then
+                /usr/local/bin/mount-efs.sh
+                apt install -y lustre-client-modules-$(uname -r) && /usr/local/bin/mount-fsx.sh
+                exit 0
+              fi
+
+              echo "Cloud init in progress. Machine will REBOOT after cloud init is complete!!" > /etc/motd
+             
+              # Find Ubuntu Version 
+              VERSION=$(lsb_release -a | grep Release | awk -F ":" '{print $2}' | sed -E -e 's/[[:blank:]]+//g')
+              echo "Detected Ubuntu $VERSION"
+
+              # setup graphics desktop
+              export DEBIAN_FRONTEND=noninteractive
+              export DEBCONF_NONINTERACTIVE_SEEN=true
+
+              # check if we have a GPU and if Nvidia drivers and CUDA need to be installed
+              [[ ! -x "$(command -v nvidia-smi)" ]] && \
+                apt-get update && apt-get -y upgrade && \
+                apt-get -y install ubuntu-drivers-common && \
+                [[ ! -z "$(ubuntu-drivers devices | grep nvidia-driver | grep recommended | awk -F " " '{print $3}')" ]] && \
+                apt-get -y install linux-headers-$(uname -r) && \
+                ( ( [[ $VERSION == "18.04" ]] &&
+                    wget https://developer.download.nvidia.com/compute/cuda/repos/ubuntu1804/x86_64/cuda-ubuntu1804.pin && \
+                    mv cuda-ubuntu1804.pin /etc/apt/preferences.d/cuda-repository-pin-600 && \
+                    apt-key adv --fetch-keys https://developer.download.nvidia.com/compute/cuda/repos/ubuntu1804/x86_64/7fa2af80.pub && \
+                    add-apt-repository "deb https://developer.download.nvidia.com/compute/cuda/repos/ubuntu1804/x86_64/ /" ) || \
+                  ( [[ $VERSION == "20.04" ]] && \
+                    wget https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2004/x86_64/cuda-ubuntu2004.pin && \
+                    mv cuda-ubuntu2004.pin /etc/apt/preferences.d/cuda-repository-pin-600 && \
+                    apt-key adv --fetch-keys https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2004/x86_64/7fa2af80.pub && \
+                    add-apt-repository "deb https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2004/x86_64/ /" ) ) && \
+                apt-get update && apt-get -y purge cuda && apt-get -y purge nvidia-* && apt-get -y autoremove && \
+                apt-get -y install cuda && \
+                apt-get -y install nvidia-cuda-toolkit && \
+                apt-get -y install libcudnn8 && \
+                apt-get -y install libcudnn8-dev && \
+                reboot
+
+              # setup software repo for docker
+              curl -fsSL https://download.docker.com/linux/ubuntu/gpg | apt-key add -
+              apt-key fingerprint 0EBFCD88
+              add-apt-repository "deb [arch=amd64] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable"
+   
+              # add key for fsx-lustre client
+              wget -O - https://fsx-lustre-client-repo-public-keys.s3.amazonaws.com/fsx-ubuntu-public-key.asc | apt-key add -
+              
+              # add key for NICE-DCV
+              wget https://d1uj6qtbmh3dt5.cloudfront.net/NICE-GPG-KEY
+              gpg --import NICE-GPG-KEY
+
+              # setup software repo for ros
+              sh -c 'echo "deb http://packages.ros.org/ros/ubuntu $(lsb_release -sc) main" > /etc/apt/sources.list.d/ros-latest.list' 
+              apt-key adv --keyserver 'hkp://keyserver.ubuntu.com:80' --recv-key C1CF6E31E6BADE8868B172B4F42ED6FBAB17C654 
+
+              # update and install required packages
+              apt update
+
+              apt install -y git tar
+              apt install -y apt-transport-https ca-certificates curl gnupg-agent software-properties-common
+              
+              # install docker if it is not installed
+              if [ ! -x "$(command -v docker)" ]; then
+                apt install -y docker-ce docker-ce-cli containerd.io      
+                usermod -aG docker ubuntu
+              fi
+
+              apt install -y tzdata
+              apt install -y keyboard-configuration
+              apt install -y gnupg2
+              apt install -y lsb-core 
+
+              # install DCV server
+              echo "install DCV server..."
+              apt install -y ubuntu-desktop
+
+              if [[ $VERSION == "18.04" ]]
+              then
+                bash -c 'echo "deb https://fsx-lustre-client-repo.s3.amazonaws.com/ubuntu bionic main" > /etc/apt/sources.list.d/fsxlustreclientrepo.list && apt-get update'
+
+                apt install -y lightdm
+                apt -y upgrade
+                echo "/usr/sbin/lightdm" > /etc/X11/default-display-manager
+                dpkg-reconfigure lightdm
+
+                apt install -y mesa-utils
+                if [ -x "$(command -v nvidia-xconfig)" ]; then
+                  nvidia-xconfig --preserve-busid --enable-all-gpus
+                fi
+
+                #restart X server
+                echo "restart X-server"
+                systemctl set-default graphical.target
+                systemctl isolate graphical.target
+
+                wget https://d1uj6qtbmh3dt5.cloudfront.net/2020.2/Servers/nice-dcv-2020.2-9662-ubuntu1804-x86_64.tgz
+                tar -xvzf nice-dcv-2020.2-9662-ubuntu1804-x86_64.tgz 
+                cd nice-dcv-2020.2-9662-ubuntu1804-x86_64
+                apt install -y  ./nice-dcv-server_2020.2.9662-1_amd64.ubuntu1804.deb
+              elif [[ $VERSION == "20.04" ]]
+              then
+                bash -c 'echo "deb https://fsx-lustre-client-repo.s3.amazonaws.com/ubuntu focal main" > /etc/apt/sources.list.d/fsxlustreclientrepo.list && apt-get update'
+                
+                apt install -y gdm3
+                apt -y upgrade
+                echo "/usr/sbin/gdm3" > /etc/X11/default-display-manager
+                dpkg-reconfigure gdm3
+                sed -i -e "s/#WaylandEnable=false/WaylandEnable=false/g" /etc/gdm3/custom.conf
+                systemctl restart gdm3
+
+                apt install -y mesa-utils
+                if [ -x "$(command -v nvidia-xconfig)" ]; then
+                  nvidia-xconfig --preserve-busid --enable-all-gpus
+                fi
+
+                #restart X server
+                echo "restart X-server"
+                systemctl set-default graphical.target
+                systemctl isolate graphical.target
+
+                wget https://d1uj6qtbmh3dt5.cloudfront.net/2020.2/Servers/nice-dcv-2020.2-9662-ubuntu2004-x86_64.tgz
+                tar -xvzf nice-dcv-2020.2-9662-ubuntu2004-x86_64.tgz
+                cd nice-dcv-2020.2-9662-ubuntu2004-x86_64
+                apt install -y ./nice-dcv-server_2020.2.9662-1_amd64.ubuntu2004.deb/
+              else
+                echo "Ubuntu $VERSION is not supported; must be one of 18.04, or 20.04"
+                exit 1
+              fi
+
+              #restart X server
+              systemctl set-default graphical.target
+              systemctl isolate graphical.target
+
+              # Create DCV server configuration file
+              mkdir  /opt/dcv-session-store
+              echo "[license]" >> dcv.conf
+              echo "[log]" >> dcv.conf
+              echo "[session-management]" >> dcv.conf
+              echo "[session-management/defaults]" >> dcv.conf
+              echo "[session-management/automatic-console-session]" >> dcv.conf
+              echo "storage-root=\"/opt/dcv-session-store/\"" >> dcv.conf
+              echo "[display]" >> dcv.conf
+              echo "[connectivity]" >> dcv.conf
+              echo "[security]" >> dcv.conf
+              echo "authentication=\"system\"" >> dcv.conf
+              echo "[clipboard]" >> dcv.conf
+              echo "primary-selection-copy=true" >> dcv.conf
+              echo "primary-selection-paste=true" >> dcv.conf
+              mv dcv.conf /etc/dcv/dcv.conf
+
+              # Enable DCV server
+              systemctl enable dcvserver
+
+              # Create DCV session permissions files
+              rm -f /home/ubuntu/dcv.perms
+              echo "[permissions]" >> /home/ubuntu/dcv.perms
+              echo "%owner% allow builtin" >> /home/ubuntu/dcv.perms
+
+              # Create startup session script
+              echo "#!/bin/bash" >> /usr/local/bin/start-dcvsession.sh
+              echo "dcv create-session --type=console --owner ubuntu --storage-root /opt/dcv-session-store/ --permissions-file /home/ubuntu/dcv.perms dcvsession" >> /usr/local/bin/start-dcvsession.sh
+              chmod a+x /usr/local/bin/start-dcvsession.sh
+
+              echo "[Unit]" >> /etc/systemd/system/dcvsession.service
+              echo "Description=DCV session service" >> /etc/systemd/system/dcvsession.service
+              echo "After=dcvserver.service" >> /etc/systemd/system/dcvsession.service
+              echo "" >> /etc/systemd/system/dcvsession.service
+              echo "[Service]" >> /etc/systemd/system/dcvsession.service
+              echo "User=root" >> /etc/systemd/system/dcvsession.service
+              echo "ExecStart=/usr/local/bin/start-dcvsession.sh" >> /etc/systemd/system/dcvsession.service
+              echo "Restart= on-abort" >> /etc/systemd/system/dcvsession.service
+              echo "" >> /etc/systemd/system/dcvsession.service
+              echo "[Install]" >> /etc/systemd/system/dcvsession.service
+              echo "WantedBy=graphical.target" >> /etc/systemd/system/dcvsession.service
+
+              systemctl enable dcvsession
+              echo "install DCV server complete"
+
+              # install nfs-common
+              apt install -y nfs-common
+
+              ROS=''
+              PYTHON=''
+              if [[ $VERSION == "18.04" ]]
+              then
+                # melodic requries Python 2.x
+                ROS='melodic'
+                PYTHON=python
+                
+                apt install -y python-minimal  python-pip
+                pip install --upgrade pip
+                pip install boto3
+                pip install kafka-python
+                pip install psycopg2-binary
+              elif [[ $VERSION == "20.04" ]]
+              then
+                # noetic requries Python 3.x
+                ROS='noetic'
+                PYTHON=python3
+              else
+                echo "Ubuntu $VERSION is not supported; must be one of 18.04, or 20.04"
+                exit 1
+              fi
+
+              apt install -y python3-minimal  python3-pip
+              test -f /usr/bin/python || ln -s `which python3` /usr/bin/python
+              pip3 install --upgrade pip
+              pip3 install boto3
+              pip3 install kafka-python
+              pip3 install psycopg2-binary
+              pip3 install --upgrade awscli
+              pip3 install jupyterlab
+
+              # install ros
+              echo "install ros $ROS ..."
+              
+              apt install -y ros-$ROS-desktop-full 
+              echo "source /opt/ros/$ROS/setup.bash" >> /home/ubuntu/.bashrc
+              apt install -y $PYTHON-rosdep $PYTHON-rosinstall $PYTHON-rosinstall-generator $PYTHON-wstool build-essential
+
+              rosdep init
+              rosdep update
+
+              # Create roscore startup script
+              echo "#!/bin/bash" >> /usr/local/bin/start-roscore.sh
+              echo "source /opt/ros/$ROS/setup.bash" >> /usr/local/bin/start-roscore.sh
+              echo "roscore" >> /usr/local/bin/start-roscore.sh
+              chmod a+x /usr/local/bin/start-roscore.sh
+
+              echo "[Unit]" >> /etc/systemd/system/roscore.service
+              echo "Description=roscore service" >> /etc/systemd/system/roscore.service
+              echo "" >> /etc/systemd/system/roscore.service
+              echo "[Service]" >> /etc/systemd/system/roscore.service
+              echo "User=ubuntu" >> /etc/systemd/system/roscore.service
+              echo "ExecStart=/usr/local/bin/start-roscore.sh" >> /etc/systemd/system/roscore.service
+              echo "Restart=on-abort" >> /etc/systemd/system/roscore.service
+              echo "" >> /etc/systemd/system/roscore.service
+              echo "[Install]" >> /etc/systemd/system/roscore.service
+              echo "WantedBy=graphical.target" >> /etc/systemd/system/roscore.service
+
+              systemctl enable roscore
+              echo "install Ros $ROS complete"
+
+              # install webviz
+              echo "setup webviz ..."
+
+              # Create startup session script
+              echo "#!/bin/bash" >> /usr/local/bin/start-webviz.sh
+              echo "docker run -p 8080:8080 cruise/webviz" >> /usr/local/bin/start-webviz.sh
+              chmod a+x /usr/local/bin/start-webviz.sh
+
+              echo "[Unit]" >> /etc/systemd/system/webviz.service
+              echo "Description=webviz service" >> /etc/systemd/system/webviz.service
+              echo "" >> /etc/systemd/system/webviz.service
+              echo "[Service]" >> /etc/systemd/system/webviz.service
+              echo "User=ubuntu" >> /etc/systemd/system/webviz.service
+              echo "ExecStart=/usr/local/bin/start-webviz.sh" >> /etc/systemd/system/webviz.service
+              echo "Restart=on-abort" >> /etc/systemd/system/webviz.service
+              echo "" >> /etc/systemd/system/webviz.service
+              echo "[Install]" >> /etc/systemd/system/webviz.service
+              echo "WantedBy=graphical.target" >> /etc/systemd/system/webviz.service
+
+              systemctl enable webviz
+
+              # clone the add-apt-repository
+              cd /home/ubuntu && git clone https://github.com/aws-samples/amazon-eks-autonomous-driving-data-service.git
+              export DIR=/home/ubuntu/amazon-eks-autonomous-driving-data-service
+              chown -R ubuntu:ubuntu  $DIR
+                          
+              # update /home/ubuntu/.bashrc
+              echo "export efs_id=${EFSFileSystem}" >> /home/ubuntu/.bashrc
+              echo "export fsx_id=${FSxFileSystem}" >> /home/ubuntu/.bashrc
+              echo "export fsx_mount_name=${FSxFileSystem.LustreMountName}" >> /home/ubuntu/.bashrc
+              echo "export s3_bucket_name=${S3Bucket}" >> /home/ubuntu/.bashrc
+              echo "export eks_cluster_name=${AWS::StackName}" >> /home/ubuntu/.bashrc
+              echo "export cfn_stack_name=${AWS::StackName}" >> /home/ubuntu/.bashrc
+              echo "export batch_job_queue=${AWS::StackName}-fargate" >> /home/ubuntu/.bashrc
+              echo "export batch_job_definition=${AWS::StackName}-pythonfroms3" >> /home/ubuntu/.bashrc
+              echo "export stepfunctions_role_arn=${StepFunctionsRole.Arn}" >> /home/ubuntu/.bashrc
+              echo "export glue_job_role_arn=${GlueJobRole.Arn}" >> /home/ubuntu/.bashrc
+              echo "export redshift_cluster_role_arn=${RedshiftClusterRole.Arn}" >> /home/ubuntu/.bashrc
+              echo "export redshift_cluster_host=${RedshiftCluster.Endpoint.Address}" >> /home/ubuntu/.bashrc
+              echo "export redshift_cluster_port=${RedshiftCluster.Endpoint.Port}" >> /home/ubuntu/.bashrc
+              echo "export redshift_cluster_username=${RedshiftMasterUsername}" >> /home/ubuntu/.bashrc
+              echo "export redshift_cluster_dbname=${RedshiftDatabaseName}" >> /home/ubuntu/.bashrc
+              echo "export redshift_cluster_password=${RedshiftMasterUserPasswordSecret}" >> /home/ubuntu/.bashrc
+              echo "export desktop_role_arn=${DesktopRole.Arn}" >> /home/ubuntu/.bashrc
+              echo "export msk_cluster_arn=${MSKCluster}" >> /home/ubuntu/.bashrc
+              echo "export eks_node_role_arn=${EksNodeRole.Arn}" >> /home/ubuntu/.bashrc
+              echo "export eks_pod_sa_role_arn=${EksPodServiceAccountRole.Arn}" >> /home/ubuntu/.bashrc
+              echo "export cluster_autoscaler_image_tag=v${KubernetesVersion}.0" >> /home/ubuntu/.bashrc
+              echo "export eks_cluster_autoscaler_role_arn=${EksClusterAutoscalerServiceAccountRole.Arn}" >> /home/ubuntu/.bashrc
+              
+              # Create FSX mount script 
+              cat >/usr/local/bin/mount-fsx.sh <<EOL
+              #!/bin/bash
+
+              if [[ ! -d /fsx ]]
+              then
+                mkdir /fsx
+              fi
+
+              # Mount FSx
+              mount -t lustre -o noatime,flock ${FSxFileSystem}.fsx.${AWS::Region}.amazonaws.com@tcp:/${FSxFileSystem.LustreMountName} /fsx
+              EOL
+
+              chmod u+x /usr/local/bin/mount-fsx.sh
+
+              # Create EFS mount script 
+              cat >/usr/local/bin/mount-efs.sh <<EOL
+              #!/bin/bash
+
+              if [[ ! -d /efs ]]
+              then
+                mkdir /efs
+              fi
+              
+              # Mount EFS
+              mount -t nfs4 -o nfsvers=4.1,rsize=1048576,wsize=1048576,hard,timeo=600,retrans=2,noresvport ${EFSFileSystem}.efs.${AWS::Region}.amazonaws.com:/ /efs
+
+              EOL
+
+              chmod u+x /usr/local/bin/mount-efs.sh
+
+              # Create config file
+              mkdir /home/ubuntu/.aws
+              cat >/home/ubuntu/.aws/config <<EOL
+              [default]
+              region = ${AWS::Region}
+              output=json
+
+              EOL
+              chown -R ubuntu:ubuntu /home/ubuntu/.aws
+
+              # install kubectl for EKS
+              mkdir -p /usr/local/bin
+              curl -o /usr/local/bin/kubectl https://amazon-eks.s3.us-west-2.amazonaws.com/${KubectlVersion}/bin/linux/amd64/kubectl
+              chmod a+x /usr/local/bin/kubectl
+              curl -o /usr/local/bin/aws-iam-authenticator https://amazon-eks.s3.us-west-2.amazonaws.com/${KubectlVersion}/bin/linux/amd64/aws-iam-authenticator
+              
+              # install eksctl 
+              curl --silent --location "https://github.com/weaveworks/eksctl/releases/latest/download/eksctl_$(uname -s)_amd64.tar.gz" | tar xz -C /tmp
+              mv /tmp/eksctl /usr/local/bin
+
+              # install helm
+              curl -o /tmp/get_helm.sh https://raw.githubusercontent.com/helm/helm/master/scripts/get-helm-3
+              chmod 700 /tmp/get_helm.sh
+              /tmp/get_helm.sh
+              rm /tmp/get_helm.sh
+
+              echo "NICE DCV server is enabled!" > /etc/motd
+
+              reboot
+
+Outputs:
+  PublicSubnet1:
+    Description: Public subnet 1
+    Value: !Ref PublicSubnet1
+    Export:
+      Name: !Join [ "-", [ !Ref "AWS::StackName", "PublicSubnet1" ] ]
+  PublicSubnet2:
+    Description: Public subnet 2
+    Value: !Ref PublicSubnet2
+    Export:
+      Name: !Join [ "-", [ !Ref "AWS::StackName", "PublicSubnet2" ] ]
+  PublicSubnet3:
+    Description: Public subnet 3
+    Value: !Ref PublicSubnet3
+    Export:
+      Name: !Join [ "-", [ !Ref "AWS::StackName", "PublicSubnet3" ] ]
+  DesktopSecurityGroupId:
+    Description: Desktop security group id
+    Value: !GetAtt DesktopSecurityGroup.GroupId
+    Export:
+      Name: !Join [ "-", [ !Ref "AWS::StackName", "DesktopSecurityGroupId" ] ]
+  DesktopInstanceProfile:
+    Description: Desktop instance profile
+    Value: !Ref DesktopInstanceProfile
+    Export:
+      Name: !Join [ "-", [ !Ref "AWS::StackName", "DesktopInstanceProfile" ] ]
+  RedshiftHost:
+    Description: Redshit  host
+    Value: !Sub "${RedshiftCluster.Endpoint.Address}"
+    Export:
+      Name: !Join [ "-", [ !Ref "AWS::StackName", "RedshiftHost" ] ]
+  RedshiftPort:
+    Description: Redshit  port
+    Value: !Sub "${RedshiftCluster.Endpoint.Port}"
+    Export:
+      Name: !Join [ "-", [ !Ref "AWS::StackName", "RedshiftPort" ] ]
+  RedshiftDb:
+    Description: Redshit database name
+    Value: !Ref RedshiftDatabaseName
+    Export:
+      Name: !Join [ "-", [ !Ref "AWS::StackName", "RedshiftDb" ] ]
+  FSxId:
+    Description: FSx for Luster file system id
+    Value: !Ref FSxFileSystem
+    Export:
+      Name: !Join [ "-", [ !Ref "AWS::StackName", "FSxId" ] ]
+  FSxMountName:
+    Description: FSx for Luster mount name
+    Value: !Sub "${FSxFileSystem.LustreMountName}"
+    Export:
+      Name: !Join [ "-", [ !Ref "AWS::StackName", "FSxMountName" ] ]
+  EFSId:
+    Description: EFS file system id
+    Value: !Ref EFSFileSystem
+    Export:
+      Name: !Join [ "-", [ !Ref "AWS::StackName", "EFSId" ] ]
+  EKSClusterEndpoint:
+    Description: EKS cluster endpoint
+    Value: !GetAtt EksControlPlane.Endpoint
+    Export:
+      Name: !Join [ "-", [ !Ref "AWS::StackName", "EKSClusterEndpoint" ] ]
+  EKSClusterName:
+    Description: EKS cluster name
+    Value: !Ref EksControlPlane
+    Export:
+      Name: !Join [ "-", [ !Ref "AWS::StackName", "EKSClusterName" ] ]
+  MSKClusterArn:
+    Description: MSK cluster Arn
+    Value: !Ref MSKCluster
+    Export:
+      Name: !Join [ "-", [ !Ref "AWS::StackName", "MSKClusterArn" ] ]

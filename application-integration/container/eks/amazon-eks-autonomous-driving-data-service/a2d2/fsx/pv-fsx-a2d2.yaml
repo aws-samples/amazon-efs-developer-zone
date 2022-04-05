@@ -1,0 +1,20 @@
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: fsx-a2d2
+spec:
+  capacity:
+    storage: 1200Gi
+  volumeMode: Filesystem
+  accessModes:
+    - ReadWriteMany
+  mountOptions:
+    - noatime
+    - flock
+  persistentVolumeReclaimPolicy: Retain
+  csi:
+    driver: fsx.csi.aws.com
+    volumeHandle: fs-xxxxxxxxxxxxxxxxx
+    volumeAttributes:
+      dnsname: fs-xxxxxxxxxxxxxxxxx.fsx.xx-xxxx-x.amazonaws.com
+      mountname: xxxxxxxx

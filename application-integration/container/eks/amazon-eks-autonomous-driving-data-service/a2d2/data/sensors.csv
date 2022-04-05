@@ -1,0 +1,12 @@
+﻿camera/front_center,camera front center
+camera/front_right,camera front right
+camera/front_left,camera front left
+camera/rear_center,camera rear center
+camera/side_right,camera side right
+camera/side_left,camera side left
+lidar/front_center,lidar front center
+lidar/front_right,lidar front right
+lidar/front_left,lidar front left
+lidar/rear_center,lidar rear center
+lidar/side_right,lidar side right
+lidar/side_left,lidar side left

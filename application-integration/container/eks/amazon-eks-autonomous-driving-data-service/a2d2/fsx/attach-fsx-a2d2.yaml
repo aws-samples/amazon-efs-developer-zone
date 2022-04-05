@@ -1,0 +1,17 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: attach-fsx-a2d2
+spec:
+  containers:
+  - name: attach-fsx-a2d2 
+    image: centos
+    command: ["/bin/sh"]
+    args: ["-c", "while true; do echo $(date -u) >> /data/out.txt; sleep 5; done"]
+    volumeMounts:
+    - name: persistent-storage
+      mountPath: /fsx
+  volumes:
+  - name: persistent-storage
+    persistentVolumeClaim:
+      claimName: fsx-a2d2

@@ -1,0 +1,306 @@
+# Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License").
+# You may not use this file except in compliance with the License.
+# A copy of the License is located at
+#
+# http://www.apache.org/licenses/LICENSE-2.0
+#
+# or in the "license" file accompanying this file. This file is distributed
+# on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either
+# express or implied. See the License for the specific language governing
+# permissions and limitations under the License.
+AWSTemplateFormatVersion: "2010-09-09"
+Description: (SO0145) Simple File Manager for Amazon EFS Solution Web %%VERSION%% 
+
+Parameters:
+  FileManagerAPIEndpoint:
+    Type: String
+  UserPoolId:
+    Type: String
+  IdentityPoolId:
+    Type: String
+  PoolClientId:
+    Type: String
+
+Mappings:
+  EFSFileSimpleApp:
+    SourceCode:
+      S3Bucket: "%%REGIONAL_BUCKET_NAME%%"
+      CodeKeyPrefix: "simple-file-manager-for-amazon-efs/%%VERSION%%"
+      TemplateKeyPrefix: "simple-file-manager-for-amazon-efs/%%VERSION%%"
+      WebsitePrefix: "simple-file-manager-for-amazon-efs/%%VERSION%%/website"
+
+Resources:
+  WebsiteBucketNameFunction:
+    Type: AWS::Lambda::Function
+    Metadata:
+        cfn_nag:
+          rules_to_suppress:
+            - id: W89
+              reason: "Custom resource deployed in default VPC"
+            - id: W92
+              reason: "ReservedConcurrentExecutions not needed since this function runs once when CloudFormation deploys"
+    Properties:
+      Code:
+        ZipFile: |
+          import string
+          import random
+          import cfnresponse
+          def handler(event, context):
+              stack_name = event['StackId'].split('/')[1].split('-Uuid')[0]
+              response_data = {'Data': stack_name.lower() + '-website'}
+              cfnresponse.send(event, context, cfnresponse.SUCCESS, response_data, "CustomResourcePhysicalID")
+      Handler: index.handler
+      Runtime: python3.8
+      Role: !GetAtt WebsiteBucketNameExecutionRole.Arn
+  WebsiteBucketNameFunctionPermissions:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: 'lambda:InvokeFunction'
+      FunctionName: !GetAtt WebsiteBucketNameFunction.Arn
+      Principal: 'cloudformation.amazonaws.com'
+  WebsiteBucketNameExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - lambda.amazonaws.com
+            Action:
+              - sts:AssumeRole
+      Path: /
+      Policies:
+        - PolicyName: root
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Effect: Allow
+                Action:
+                  - logs:CreateLogGroup
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                Resource: 
+                  !Sub arn:aws:logs:${AWS::Region}:${AWS::AccountId}:*
+  GetWebsiteBucketName:
+    Type: Custom::CustomResource
+    Properties:
+      ServiceToken: !GetAtt WebsiteBucketNameFunction.Arn
+
+  EFSFileSimpleWebsiteBucket:
+    Type: AWS::S3::Bucket
+    DeletionPolicy: Retain
+    Properties:
+      AccessControl: LogDeliveryWrite
+      BucketName: !GetAtt GetWebsiteBucketName.Data
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+      WebsiteConfiguration:
+        IndexDocument: "index.html"
+        ErrorDocument: "index.html"
+      LoggingConfiguration:
+        DestinationBucketName: !GetAtt GetWebsiteBucketName.Data
+        LogFilePrefix: "access_logs/"
+      LifecycleConfiguration:
+        Rules:
+          - Id: "Keep access log for 30 days"
+            Status: Enabled
+            Prefix: "access_logs/"
+            ExpirationInDays: 30
+            AbortIncompleteMultipartUpload:
+              DaysAfterInitiation: 1
+          - Id: "Keep cloudfront log for 30 days"
+            Status: Enabled
+            Prefix: "cf_logs/"
+            ExpirationInDays: 30
+            AbortIncompleteMultipartUpload:
+              DaysAfterInitiation: 1
+
+  WebBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref EFSFileSimpleWebsiteBucket
+      PolicyDocument:
+        Statement:
+          - Effect: Deny
+            Principal: "*"
+            Action: "*"
+            Resource: !Sub "arn:aws:s3:::${EFSFileSimpleWebsiteBucket}/*"
+            Condition:
+              Bool:
+                aws:SecureTransport: false
+
+  CopyWebSource:
+    Type: Custom::WebsiteDeployHelper
+    Properties:
+      ServiceToken: !GetAtt WebsiteDeployHelper.Arn
+      WebsiteCodeBucket: 
+        !Join ["-", [!FindInMap ["EFSFileSimpleApp", "SourceCode", "S3Bucket"], Ref: "AWS::Region"]]
+      WebsiteCodePrefix: !FindInMap ["EFSFileSimpleApp", "SourceCode", "WebsitePrefix"]
+      DeploymentBucket: !GetAtt EFSFileSimpleWebsiteBucket.DomainName
+
+  EFSFileSimpleOriginAccessIdentity:
+    Type: AWS::CloudFront::CloudFrontOriginAccessIdentity
+    Properties:
+      CloudFrontOriginAccessIdentityConfig:
+        Comment: !Sub "access-identity-${EFSFileSimpleWebsiteBucket}"
+
+  EFSFileSimpleWebsiteBucketPolicy:
+    Type: "AWS::S3::BucketPolicy"
+    Metadata:
+      cfn_nag:
+        rules_to_suppress:
+          - id: F16
+            reason: "website bucket policy requires a wildcard principal"
+    Properties:
+      Bucket:
+        Ref: "EFSFileSimpleWebsiteBucket"
+      PolicyDocument:
+        Statement:
+          - Effect: "Allow"
+            Action:
+              - "s3:GetObject"
+            Resource:
+              - !Sub "arn:aws:s3:::${EFSFileSimpleWebsiteBucket}/*"
+            Principal:
+              CanonicalUser: !GetAtt EFSFileSimpleOriginAccessIdentity.S3CanonicalUserId
+
+  EFSFileSimpleWebsiteDistribution:
+    Type: AWS::CloudFront::Distribution
+    Metadata:
+      cfn_nag:
+        rules_to_suppress:
+          - id: W70
+            reason: "Cloudfront protocol version TLS 1.2"
+    Properties:
+      DistributionConfig:
+        Comment: "Website distribution for Simple File Manager for EFS Solution"
+        Logging:
+          Bucket: !Sub "${EFSFileSimpleWebsiteBucket}.s3.amazonaws.com"
+          Prefix: cf_logs/
+          IncludeCookies: true
+        Origins:
+          - Id: S3-solution-website
+            DomainName: !Sub "${EFSFileSimpleWebsiteBucket}.s3.${AWS::Region}.amazonaws.com"
+            S3OriginConfig:
+              OriginAccessIdentity: !Sub "origin-access-identity/cloudfront/${EFSFileSimpleOriginAccessIdentity}"
+        DefaultCacheBehavior:
+          TargetOriginId: S3-solution-website
+          AllowedMethods:
+            - GET
+            - HEAD
+            - OPTIONS
+            - PUT
+            - POST
+            - DELETE
+            - PATCH
+          CachedMethods:
+            - GET
+            - HEAD
+            - OPTIONS
+          ForwardedValues:
+            QueryString: false
+          ViewerProtocolPolicy: redirect-to-https
+        DefaultRootObject: "index.html"
+        CustomErrorResponses:
+          - ErrorCode: 404
+            ResponsePagePath: "/index.html"
+            ResponseCode: 200
+          - ErrorCode: 403
+            ResponsePagePath: "/index.html"
+            ResponseCode: 200
+        IPV6Enabled: true
+        ViewerCertificate:
+          CloudFrontDefaultCertificate: true
+        Enabled: true
+        HttpVersion: 'http2'
+
+  WebsiteHelperRole:
+    Type: AWS::IAM::Role
+    Metadata:
+      cfn_nag:
+        rules_to_suppress:
+          - id: W11
+            reason: "Website helper Lambda requires ability to read / write to both Content Analysis website bucket and build bucket"
+    DependsOn: EFSFileSimpleWebsiteBucket
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - lambda.amazonaws.com
+            Action:
+              - sts:AssumeRole
+      Policies:
+        - PolicyName: !Sub "${AWS::StackName}-WebsiteHelperS3Access"
+          PolicyDocument:
+            Statement:
+              - Effect: Allow
+                Action:
+                  - "s3:GetObject"
+                  - "s3:PutObject"
+                  - "s3:ListBucket"
+                Resource:
+                  - !Sub ${EFSFileSimpleWebsiteBucket.Arn}/*
+                  - Fn::Sub:
+                      - arn:aws:s3:::${websitecode}/*
+                      - websitecode: !Join ["-", [!FindInMap ["EFSFileSimpleApp", "SourceCode", "S3Bucket"], Ref: "AWS::Region"]]
+              - Effect: Allow
+                Action:
+                  - "s3:ListBucket"
+                Resource:
+                  - !Sub ${EFSFileSimpleWebsiteBucket.Arn}
+                  - Fn::Sub:
+                      - arn:aws:s3:::${websitecode}
+                      - websitecode: !Join ["-", [!FindInMap ["EFSFileSimpleApp", "SourceCode", "S3Bucket"], Ref: "AWS::Region"]]
+              - Effect: Allow
+                Action:
+                  - "logs:CreateLogGroup"
+                  - "logs:CreateLogStream"
+                  - "logs:PutLogEvents"
+                Resource:
+                  - !Sub "arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/*"
+
+  WebsiteDeployHelper:
+    Type: AWS::Lambda::Function
+    Metadata:
+      cfn_nag:
+        rules_to_suppress:
+          - id: W89
+            reason: "Custom resource deployed in default VPC"
+          - id: W92
+            reason: "ReservedConcurrentExecutions not needed since this function runs once when CloudFormation deploys"
+    Properties:
+      Code:
+        S3Bucket: !Join ["-", [!FindInMap ["EFSFileSimpleApp", "SourceCode", "S3Bucket"], Ref: "AWS::Region"]]
+        S3Key:
+          !Join [
+            "/",
+            [
+            !FindInMap ["EFSFileSimpleApp", "SourceCode", "CodeKeyPrefix"],
+            "websitehelper.zip",
+            ],
+          ]
+      Handler: website_helper.lambda_handler
+      MemorySize: 256
+      Role: !GetAtt WebsiteHelperRole.Arn
+      Runtime: python3.6
+      Timeout: 900
+      Environment:
+        Variables:
+          FileManagerAPIEndpoint: !Ref FileManagerAPIEndpoint
+          AwsRegion: !Ref AWS::Region
+          UserPoolId: !Ref UserPoolId
+          IdentityPoolId: !Ref IdentityPoolId
+          PoolClientId: !Ref PoolClientId
+
+Outputs:
+  EFSFileSimpleWebsiteUrl:
+    Value: !Join ["", ["https://", !GetAtt EFSFileSimpleWebsiteDistribution.DomainName]]

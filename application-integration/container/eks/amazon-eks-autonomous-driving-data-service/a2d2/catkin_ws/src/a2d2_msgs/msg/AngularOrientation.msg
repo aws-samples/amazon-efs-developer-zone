@@ -1,0 +1,2 @@
+float32 pitch_angle
+float32 roll_angle

@@ -1,0 +1,59 @@
+global:
+  namespace: a2d2 
+
+persistentVolumeClaim:
+  efs: "efs-a2d2"
+  fsx: "fsx-a2d2"
+
+a2d2:
+  name: a2d2-data-service 
+  image:
+    uri: '' 
+    policy: Always
+  replicaCount: 1
+  maxReplicaCount: 10
+  requests:
+    memory: "72Gi"
+    cpu: "8000m"
+  metric:
+    name: "cpu"
+    average: "50"
+  config:
+    dir: "/etc/config"
+    path: "a2d2-data-service.conf"
+  serviceAccount:
+    name: a2d2-data-service-sa
+    roleArn: ""
+
+configMap:
+  {
+    "servers": "",
+    "kafka_topic": "a2d2",
+    "database": {
+        "dbname": "mozart",
+        "host": "",
+        "port": "5439",
+        "user": "admin",
+        "password": ""
+    },
+    "data_store": {
+        "fsx": {
+            "root": "/fsx",
+            "rosbag": "/fsx/rosbag"
+        },
+        "efs": {
+            "root": "/efs",
+            "rosbag": "/efs/rosbag"
+        },
+        "s3": {
+            "rosbag_bucket": "",
+            "rosbag_prefix": "rosbag/"
+        },
+        "input": "fsx"
+    },
+    "max_response_tasks": 1,
+    "calibration": {
+      "cal_bucket": "",
+      "cal_key": "a2d2/cams_lidars.json"
+    }
+  }

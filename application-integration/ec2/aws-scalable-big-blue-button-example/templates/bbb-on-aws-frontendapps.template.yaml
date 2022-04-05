@@ -1,0 +1,1142 @@
+---
+AWSTemplateFormatVersion: '2010-09-09'
+Description: >
+
+  This Cloudformation Template deploys the frontend applications Greenlight and Scalelite to the previously created ECS Cluster.
+
+  Disclaimer: Not for production use. Demo and testing purposes only.
+
+  Author: David Surey <suredavi@amazon.com>, Bastian Klein <basklein@amazon.com>
+
+Parameters:
+  BBBHostedZone:
+    Description: Hosted zone in which the DNS entries
+    Type: String
+  BBBDomainName:
+    Description: Base domain name
+    Type: String
+  BBBFrontendELBSecurityGroup:
+    Description: Security Group that should be assigned for the frontend ELB
+    Type: String
+  BBBScaleliteELBSecurityGroup:
+    Description: Security Group that should be assigned for the Scalelite ELB
+    Type: String
+  BBBPublicApplicationSubnets:
+    Description: Comma separated list of the public subnets
+    Type: CommaDelimitedList
+  BBBPrivateApplicationSubnets:
+    Description: Comma separated list of the private EC2 instance subnets
+    Type: CommaDelimitedList
+  BBBNotificationTopic:
+    Description: Topic to be used for alarm notifications
+    Type: String
+  BBBVPCs:
+    Description: Reference for the VPC
+    Type: String
+  BBBEnvironmentStage:
+    Type: String
+    Description: Select the appropriate environment
+    AllowedValues:
+      - stage
+      - prod
+      - dev
+  BBBDBName:
+    Description: Database Name
+    Type: String
+  BBBRDSDBSecret:
+    Description: Amazon RDS Secret
+    Type: String
+  BBBRDSDBConnectionSecret:
+    Description: Amazon RDS Connection Secret
+    Type: String
+  BBBECSCluster:
+    Description: Reference for the ECS Cluster in which to deploy the services
+    Type: String
+  BBBgreenlightImage:
+    Description: Greenlight docker image identifier
+    Type: String
+    Default: "bigbluebutton/greenlight:v2"
+  BBBScaleliteApiImage:
+    Description: Scalelite API docker image identifier
+    Type: String
+    Default: "blindsidenetwks/scalelite:v1-api"
+  BBBScaleliteNginxImage:
+    Description: Scalelite NGINX docker image identifier
+    Type: String
+    Default: "blindsidenetwks/scalelite:v1-nginx"
+  BBBScalelitePollerImage:
+    Description: Scalelite Poller docker image identifier
+    Type: String
+    Default: "blindsidenetwks/scalelite:v1-poller"
+  BBBScaleliteImporterImage:
+    Description: Scalelite Importer docker image identifier
+    Type: String
+    Default: "blindsidenetwks/scalelite:v1-recording-importer"
+  BBBECRRegistry: 
+    Description: ECR Registry to be used. 
+    Type: String
+    Default: ""
+  BBBCacheDBAddress:
+    Description: Amazon ElastiCache Cluster address
+    Type: String
+  BBBCacheDBPort:
+    Description: Amazon ElastiCache Cluster port
+    Type: String
+  BBBTurnSecret:
+    Description: Secret used for Turn communication
+    Type: String
+  BBBGreenlightMemory:
+    Description: Memory constraints for Greenlight container
+    Type: Number
+    Default: 1024
+  BBBGreenlightCPU:
+    Description: CPU constraints for Greenlight container
+    Type: Number
+    Default: 512
+  BBBScaleliteMemory:
+    Description: Memory constraints for Scalelite Fargate Task
+    Type: Number
+    Default: 2048
+  BBBScaleliteCPU:
+    Description: CPU constraints for Scalelite Fargate Task
+    Type: Number
+    Default: 1024
+  BBBSESProviderArn:
+    Description: ARN of the custom SES provider
+    Type: String
+  BBBSMTPSecretProviderArn:
+    Description: ARN of the custom SMTP secrets provider
+    Type: String
+  BBBGreenlightMinReplicas:
+    Description: Minimum amount of Greenlight containers available
+    Type: Number
+    Default: 1
+  BBBGreenlightMaxReplicas:
+    Description: Maximum amount of Greenlight containers available
+    Type: Number
+    Default: 3
+  BBBGreenlightDesiredReplicas:
+    Description: Desired amount of Greenlight containers available
+    Type: Number
+    Default: 1
+  BBBScaleliteMinReplicas:
+    Description: Minimum amount of Scalelite containers available
+    Type: Number
+    Default: 1
+  BBBScaleliteMaxReplicas:
+    Description: Maximum amount of Scalelite containers available
+    Type: Number
+    Default: 3
+  BBBScaleliteDesiredReplicas:
+    Description: Desired amount of Scalelite containers available
+    Type: Number
+    Default: 1
+  BBBSharedStorageFS:
+    Description: File system id for the Amazon EFS volume to be mounted
+    Type: String
+  BBBSharedStorageAPspool:
+    Description: Access Point id for the Amazon EFS volume to be mounted
+    Type: String
+  BBBSharedStorageAPpublished:
+    Description: Access Point id for the Amazon EFS volume to be mounted
+    Type: String
+  BBBSharedStorageAPunpublished:
+    Description: Access Point id for the Amazon EFS volume to be mounted
+    Type: String
+  BBBSharedStorageAPrecordings:
+    Description: Access Point id for the Amazon EFS volume to be mounted
+    Type: String
+  BBBSesRegion:
+    Description: Region for the SES Domain. If not set, current deployment region will be used
+    Type: String
+  BBBOperatorEMail:
+    Description: EMail address to notify if there are any operational issues
+    Type: String
+    AllowedPattern: "([a-zA-Z0-9_\\-\\.]+)@((\\[[0-9]{1,3}\\.[0-9]{1,3}\\.[0-9]{1,3}\\.)|(([a-zA-Z0-9\\-]+\\.)+))([a-zA-Z]{2,4}|[0-9]{1,3})(\\]?)"
+    ConstraintDescription: must be a valid email address.
+    Default: johndoe@example.com
+  BBBECSInstanceType:
+    Description: Set the ECS Instance Type to either EC2 based or Fargate based deployments
+    Type: String
+  BBBECSTaskSecurityGroup:
+    Description: Security Group that should be assigned for the EC2 Instances
+    Type: String
+  BBBApplicationLogsGroup:
+    Description: Log group to be used for the Application logs
+    Type: String
+  BBBSESValidated: 
+    Description: If the SES Domain is already validated manually we do not need the automation
+    Type: String
+    Default: false
+    AllowedValues: [ true, false ]
+  BBBACMCertArn: 
+    Description: Set this parameter if you want to reuse an existing ACM certificate for your deployment
+    Type: String
+    Default: "AWS::NoValue"
+
+Conditions:
+  BBBSESRegionSet: !Not [ !Equals [ !Ref BBBSesRegion, "AWS::NoValue" ] ]
+  BBBECSFargate: !Equals [ !Ref BBBECSInstanceType, fargate ]
+  BBBECSEC2: !Not [ !Equals [ !Ref BBBECSInstanceType, fargate ] ]
+  BBBSESNotValidated: !Equals [ false, !Ref BBBSESValidated ]
+  BBBACMNewCert: !Equals [ !Ref BBBACMCertArn, "AWS::NoValue" ]
+
+Resources:
+  BBBSESDomainIdentity:
+    Type: Custom::DomainIdentity
+    Condition: BBBSESNotValidated
+    Properties:
+      Domain: !Ref BBBDomainName
+      Region: !If [ BBBSESRegionSet, !Ref BBBSesRegion, !Ref "AWS::Region" ]
+      RecordSetDefaults:
+        TTL: 60
+        Weight: 1
+        SetIdentifier: !If [ BBBSESRegionSet, !Ref BBBSesRegion, !Ref "AWS::Region" ]
+      ServiceToken: !Ref BBBSESProviderArn
+
+  BBBSESVerifiedIdentity:
+    Type: Custom::VerifiedIdentity
+    Condition: BBBSESNotValidated
+    DependsOn:
+      - BBBSESDkimRecords
+      - BBBSESVerificationRecords
+    Properties:
+      Identity: !GetAtt BBBSESDomainIdentity.Domain
+      Region: !GetAtt BBBSESDomainIdentity.Region
+      Dummy: true
+      ServiceToken: !Ref BBBSESProviderArn
+
+  BBBSESVerificationRecords:
+    Type: AWS::Route53::RecordSetGroup
+    Condition: BBBSESNotValidated
+    Properties:
+      Comment: !Sub 'SES identity for ${BBBDomainName}'
+      HostedZoneId: !Ref BBBHostedZone
+      RecordSets: !GetAtt 'BBBSESDomainIdentity.RecordSets'
+
+  BBBSESDkimTokens:
+    Type: Custom::DkimTokens
+    Condition: BBBSESNotValidated
+    Properties:
+      Domain: !GetAtt 'BBBSESDomainIdentity.Domain'
+      Region: !GetAtt 'BBBSESDomainIdentity.Region'
+      ServiceToken: !Ref BBBSESProviderArn
+
+  BBBSESDkimRecords:
+    Type: AWS::Route53::RecordSetGroup
+    Condition: BBBSESNotValidated
+    Properties:
+      Comment: !Sub 'DKIM records for ${BBBDomainName}'
+      HostedZoneId: !Ref BBBHostedZone
+      RecordSets: !GetAtt 'BBBSESDkimTokens.RecordSets'
+
+  BBBSESIdentityNotifications:
+    Type: Custom::IdentityNotifications
+    Condition: BBBSESNotValidated
+    Properties:
+      Identity: !GetAtt BBBSESVerifiedIdentity.Identity
+      Region: !GetAtt BBBSESVerifiedIdentity.Region
+      BounceTopic: !Ref BBBNotificationTopic
+      ComplaintTopic: !Ref  BBBNotificationTopic
+      HeadersInBounceNotificationsEnabled: true
+      HeadersInComplaintNotificationsEnabled: true
+      ForwardingEnabled: false
+      ServiceToken: !Ref BBBSESProviderArn
+
+  BBBSMTPUser:
+    Type: AWS::IAM::User
+    Properties:
+      Policies:
+        - PolicyName: BBBSMTPUserPolicy
+          PolicyDocument:
+            Statement:
+              - Effect: Allow
+                Action:
+                  - ses:SendRawEmail
+                Resource: "*"
+
+  BBBUserAccessKey:
+    Type: AWS::IAM::AccessKey
+    Properties:
+      Serial: 8
+      Status: Active
+      UserName: !Ref BBBSMTPUser
+
+  BBBSMTPAccessKey:
+    Type: Custom::SMTPPW
+    Properties:
+      Description: The SMTP User Password for Email Sendout
+      SecretKey: !GetAtt BBBUserAccessKey.SecretAccessKey
+      Region: !If [ BBBSESRegionSet, !Ref BBBSesRegion, !Ref "AWS::Region" ]
+      NoEcho: true
+      ServiceToken: !Ref BBBSMTPSecretProviderArn
+
+  BBBSMTPAccessSecret:
+    Type: AWS::SecretsManager::Secret
+    Properties:
+      Description: 'This is the BBB SMTP Login'
+      SecretString: !Sub "{\"smtpusername\":\"${BBBUserAccessKey}\",\"smtppassword\":\"${BBBSMTPAccessKey}\"}"
+
+  BBBApplicationBaseSecret:
+    Type: AWS::SecretsManager::Secret
+    Properties:
+      Description: 'This is the BBB base secret'
+      GenerateSecretString:
+        SecretStringTemplate: '{"basekeyname": "basesecretkey"}'
+        GenerateStringKey: 'basekeyvalue'
+        PasswordLength: 64
+        ExcludePunctuation: true
+        ExcludeUppercase: true
+
+  BBBLoadbalancerSecret:
+    Type: AWS::SecretsManager::Secret
+    Properties:
+      Description: 'This is the BBB Loadbalancer secret'
+      GenerateSecretString:
+        SecretStringTemplate: '{"basekeyname": "basesecretkey"}'
+        GenerateStringKey: 'basekeyvalue'
+        PasswordLength: 32
+        ExcludePunctuation: true
+        ExcludeUppercase: true
+
+  BBBAdministratorlogin:
+    Type: AWS::SecretsManager::Secret
+    Properties:
+      Description: 'This is the BBB base secret'
+      GenerateSecretString:
+        SecretStringTemplate: !Sub "{\"username\":\"${BBBOperatorEMail}\"}"
+        GenerateStringKey: 'password'
+        PasswordLength: 16
+        ExcludePunctuation: true
+
+  BBBScaleliteExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: BBBScaleliteExecutionRole
+      AssumeRolePolicyDocument:
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: ecs-tasks.amazonaws.com
+            Action: 'sts:AssumeRole'
+      ManagedPolicyArns:
+        - 'arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy'
+      Policies:
+        - PolicyName: BBBScaleliteSecretPolicy
+          PolicyDocument:
+            Statement:
+              - Effect: Allow
+                Action:
+                  - "ssm:GetParameters"
+                  - "secretsmanager:GetSecretValue"
+                Resource:
+                  - !Ref BBBRDSDBSecret
+                  - !Ref BBBRDSDBConnectionSecret
+                  - !Ref BBBApplicationBaseSecret
+                  - !Ref BBBLoadbalancerSecret
+
+  BBBScaleliteRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: ecs-tasks.amazonaws.com
+            Action: 'sts:AssumeRole'
+
+  BBBGreenlightTaskExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: BBBGreenlightExecutionRole
+      AssumeRolePolicyDocument:
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: ecs-tasks.amazonaws.com
+            Action: 'sts:AssumeRole'
+      ManagedPolicyArns:
+        - 'arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy'
+      Policies:
+        - PolicyName: BBBGreenlightSecretPolicy
+          PolicyDocument:
+            Statement:
+              - Effect: Allow
+                Action:
+                  - "ssm:GetParameters"
+                  - "secretsmanager:GetSecretValue"
+                Resource:
+                  - !Ref BBBRDSDBSecret
+                  - !Ref BBBRDSDBConnectionSecret
+                  - !Ref BBBApplicationBaseSecret
+                  - !Ref BBBSMTPAccessSecret
+                  - !Ref BBBAdministratorlogin
+                  - !Ref BBBLoadbalancerSecret
+
+  BBBGreenlightTaskRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: ecs-tasks.amazonaws.com
+            Action: 'sts:AssumeRole'
+
+  BBBAutoscalingRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: [ application-autoscaling.amazonaws.com ]
+            Action: [ "sts:AssumeRole" ]
+      Path: /
+      Policies:
+        - PolicyName: service-autoscaling
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - "cloudwatch:DescribeAlarms"
+                  - "cloudwatch:PutMetricAlarm"
+                  - "ecs:DescribeServices"
+                  - "ecs:UpdateService"
+                Resource:
+                  - !Ref BBBgreenlightService
+                  - !Ref BBBScaleliteService
+                  - !Sub "arn:aws:cloudwatch:${AWS::Region}:${AWS::AccountId}:alarm:*"
+
+  BBBPublicCertificate:      
+    Condition: BBBACMNewCert
+    Type: 'AWS::CertificateManager::Certificate'
+    Properties:
+      ValidationMethod: DNS
+      DomainName: !Sub "*.${BBBDomainName}"
+      SubjectAlternativeNames:
+        - !Ref BBBDomainName
+        - !Sub "*.${BBBDomainName}"
+      DomainValidationOptions:
+        - DomainName: !Ref BBBDomainName
+          HostedZoneId: !Ref BBBHostedZone
+      ValidationMethod: DNS
+
+  BBBFrontendALB:
+    Type: AWS::ElasticLoadBalancingV2::LoadBalancer
+    Properties:
+      Scheme: internet-facing
+      LoadBalancerAttributes:
+        - Key: idle_timeout.timeout_seconds
+          Value: "30"
+      Subnets: !Ref BBBPublicApplicationSubnets
+      SecurityGroups:
+        - !Ref BBBFrontendELBSecurityGroup
+
+  BBBFrontendALBListener:
+    Type: AWS::ElasticLoadBalancingV2::Listener
+    Properties:
+      DefaultActions:
+        - Type: redirect
+          RedirectConfig:
+            Path: /b
+            StatusCode: HTTP_301
+      LoadBalancerArn: !Ref BBBFrontendALB
+      Port: 443
+      Protocol: HTTPS
+      Certificates:
+        - CertificateArn: !If [ BBBACMNewCert, !Ref BBBPublicCertificate, !Ref BBBACMCertArn  ]
+
+  BBBFrontendALBListenerRule:
+    Type: AWS::ElasticLoadBalancingV2::ListenerRule
+    Properties:
+      Actions:
+        - Type: forward
+          TargetGroupArn: !Ref BBBFrontendTG
+      Conditions:
+        - Field: path-pattern
+          Values: [ /b* ]
+      ListenerArn: !Ref BBBFrontendALBListener
+      Priority: 1
+
+  BBBFrontendTG:
+    Type: AWS::ElasticLoadBalancingV2::TargetGroup
+    DependsOn: BBBFrontendALB
+    Properties:
+      HealthCheckIntervalSeconds: 90
+      HealthCheckPath: /b
+      HealthCheckProtocol: HTTP
+      HealthCheckTimeoutSeconds: 60
+      HealthyThresholdCount: 3
+      Port: 80
+      TargetType: !If [ BBBECSFargate, ip, instance ]
+      Protocol: HTTP
+      UnhealthyThresholdCount: 3
+      VpcId: !Ref BBBVPCs
+
+  BBBFrontendALBListenerHTTP2HTTPS:
+    Type: AWS::ElasticLoadBalancingV2::Listener
+    Properties:
+      DefaultActions:
+      - Type: redirect
+        RedirectConfig:
+          Host: "#{host}"
+          Path: "/#{path}"
+          Port: "443"
+          Protocol: "HTTPS"
+          Query: "#{query}"
+          StatusCode: "HTTP_301"
+      LoadBalancerArn: !Ref BBBFrontendALB
+      Port: 80
+      Protocol: HTTP
+
+  BBBFrontendALBDNS:
+    Type: AWS::Route53::RecordSetGroup
+    Properties:
+      HostedZoneId: !Ref BBBHostedZone
+      Comment: ALB for Big Blue Button Frontend
+      RecordSets:
+        - Name: !Sub conference.${BBBDomainName}
+          Type: CNAME
+          TTL: '60'
+          ResourceRecords:
+            - !GetAtt 'BBBFrontendALB.DNSName'
+
+  BBBScaleliteALBDNSName:
+    Type: AWS::Route53::RecordSetGroup
+    Properties:
+      HostedZoneId: !Ref BBBHostedZone
+      Comment: ALB for Scalelite
+      RecordSets:
+        - Name: !Sub scalelite.${BBBDomainName}
+          Type: CNAME
+          TTL: '60'
+          ResourceRecords:
+            - !GetAtt 'BBBScaleliteALB.DNSName'
+
+  BBBScaleliteALB:
+    Type: AWS::ElasticLoadBalancingV2::LoadBalancer
+    Properties:
+      Scheme: internet-facing
+      LoadBalancerAttributes:
+        - Key: idle_timeout.timeout_seconds
+          Value: "30"
+      Subnets: !Ref BBBPublicApplicationSubnets
+      SecurityGroups:
+        - !Ref BBBScaleliteELBSecurityGroup
+
+  BBBScaleliteALBListener:
+    Type: AWS::ElasticLoadBalancingV2::Listener
+    Properties:
+      DefaultActions:
+        - Type: forward
+          TargetGroupArn: !Ref BBBScaleliteTG
+      LoadBalancerArn: !Ref BBBScaleliteALB
+      Port: 443
+      Protocol: HTTPS
+      Certificates:
+        - CertificateArn: !If [ BBBACMNewCert, !Ref BBBPublicCertificate, !Ref BBBACMCertArn  ]
+
+  BBBScaleliteALBListenerRule:
+    Type: AWS::ElasticLoadBalancingV2::ListenerRule
+    Properties:
+      Actions:
+        - Type: forward
+          TargetGroupArn: !Ref BBBScaleliteTG
+      Conditions:
+        - Field: path-pattern
+          Values: [ / ]
+      ListenerArn: !Ref BBBScaleliteALBListener
+      Priority: 1
+
+  BBBScaleliteTG:
+    Type: AWS::ElasticLoadBalancingV2::TargetGroup
+    DependsOn: BBBScaleliteALB
+    Properties:
+      HealthCheckIntervalSeconds: 90
+      HealthCheckPath: /
+      HealthCheckProtocol: HTTP
+      HealthCheckTimeoutSeconds: 60
+      HealthyThresholdCount: 2
+      Port: 80
+      TargetType: !If [ BBBECSFargate, ip, instance ]
+      Protocol: HTTP
+      UnhealthyThresholdCount: 2
+      VpcId: !Ref BBBVPCs
+
+  BBBgreenlightTaskdefinition:
+    Type: AWS::ECS::TaskDefinition
+    DependsOn:
+      - BBBSMTPAccessKey
+    Properties:
+      Family: !Join [ "", [ !Ref "AWS::StackName", -greenlight ] ]
+      ExecutionRoleArn: !Ref BBBGreenlightTaskExecutionRole
+      NetworkMode: !If [ BBBECSFargate, awsvpc, !Ref "AWS::NoValue" ]
+      Memory: !Ref BBBGreenlightMemory
+      Cpu: !Ref BBBGreenlightCPU
+      TaskRoleArn: !Ref BBBGreenlightTaskRole
+      RequiresCompatibilities:
+        !If
+        - BBBECSFargate
+        - - FARGATE
+        - !Ref "AWS::NoValue"
+      ContainerDefinitions:
+        - Name: greenlight
+          Essential: true
+          Image: 
+            !Join
+              - '/'
+              - - !Ref BBBECRRegistry
+                - !Ref BBBgreenlightImage
+          LogConfiguration:
+            LogDriver: awslogs
+            Options:
+              awslogs-group: !Ref BBBApplicationLogsGroup
+              awslogs-region: !Ref "AWS::Region"
+              awslogs-stream-prefix: greenlight
+          PortMappings:
+            - ContainerPort: 80
+          Command:
+            - /bin/sh
+            - -c
+            - |
+              if [ "$RAILS_ENV" = "production" ] && [ "$DB_ADAPTER" = "postgresql" ]; then
+                while ! curl http://$DB_HOST:${DB_PORT:-5432}/ 2>&1 | grep '52'
+                do
+                  echo "Waiting for postgres to start up ..."
+                  sleep 1
+                done
+              fi
+                
+              db_create="$(RAILS_ENV=$RAILS_ENV bundle exec rake db:create 2>&1)"
+              echo $db_create
+              
+              if [[ $db_create == *"already exists"* ]]; then
+                echo ">>> Database migration"
+                bundle exec rake db:migrate
+              else
+                echo ">>> Database initialization"
+                bundle exec rake db:schema:load
+                bundle exec rake user:create["bbbadmin","${ADMIN_LOGIN}","${ADMIN_PASSWORD}","admin"]
+              fi
+              
+              bundle exec rake assets:precompile
+              
+              exec bundle exec puma -C config/puma.rb
+          Secrets:
+            - Name: ADMIN_PASSWORD
+              ValueFrom: !Sub "${BBBAdministratorlogin}:password::"
+            - Name: SECRET_KEY_BASE
+              ValueFrom: !Sub "${BBBApplicationBaseSecret}:basekeyvalue::"
+            - Name: BIGBLUEBUTTON_SECRET
+              ValueFrom: !Sub "${BBBLoadbalancerSecret}:basekeyvalue::"
+            - Name: DB_PASSWORD
+              ValueFrom: !Sub "${BBBRDSDBSecret}:password::"
+            - Name: SMTP_PASSWORD
+              ValueFrom: !Sub "${BBBSMTPAccessSecret}:smtppassword::"
+            - Name: DB_USERNAME
+              ValueFrom: !Sub "${BBBRDSDBSecret}:username::"
+            - Name: SMTP_USERNAME
+              ValueFrom: !Sub "${BBBSMTPAccessSecret}:smtpusername::"
+            - Name: DB_HOST
+              ValueFrom: !Sub "${BBBRDSDBConnectionSecret}:hostname::"
+            - Name: DB_PORT
+              ValueFrom: !Sub "${BBBRDSDBConnectionSecret}:port::"
+          Environment:
+            - Name: ADMIN_LOGIN
+              Value: !Join [ '', [ '{{resolve:secretsmanager:', !Ref BBBAdministratorlogin, ':SecretString:username}}' ] ]
+            - Name: DB_ADAPTER
+              Value: postgresql
+            - Name: DB_NAME
+              Value: !Join [ '_', [ !Ref BBBDBName, !Ref BBBEnvironmentStage ] ]
+            - Name: BIGBLUEBUTTON_ENDPOINT
+              Value: !Join [ "", [ "https://", !Sub "scalelite.${BBBDomainName}", "/bigbluebutton/api" ] ]
+            - Name: ALLOW_GREENLIGHT_ACCOUNTS
+              Value: "true"
+            - Name: RAILS_LOG_TO_STDOUT
+              Value: "true"
+            - Name: ALLOW_MAIL_NOTIFICATIONS
+              Value: "true"
+            - Name: GREENLIGHT_DOMAIN
+              Value: !Sub ${BBBDomainName}
+            - Name: GREENLIGHT_USE_WEBHOOKS
+              Value: "false"
+            - Name: SMTP_SERVER
+              Value: !If [ BBBSESRegionSet, !Sub "email-smtp.${BBBSesRegion}.amazonaws.com" , !Sub "email-smtp.${AWS::Region}.amazonaws.com" ]
+            - Name: SMTP_PORT
+              Value: 587
+            - Name: SMTP_DOMAIN
+              Value: !Sub ${BBBDomainName}
+            - Name: SMTP_AUTH
+              Value: LOGIN
+            - Name: SMTP_STARTTLS_AUTO
+              Value: "true"
+            - Name: SMTP_SENDER
+              Value: !Sub "bigbluebutton@${BBBDomainName}"
+
+  BBBgreenlightService:
+    Type: AWS::ECS::Service
+    DependsOn:
+      - BBBFrontendALBListener
+      - BBBFrontendALBListenerRule
+    Properties:
+      Cluster: !Ref BBBECSCluster
+      DesiredCount: !Ref BBBGreenlightDesiredReplicas
+      PlatformVersion: !If [ BBBECSFargate, 1.4.0, !Ref "AWS::NoValue" ]
+      NetworkConfiguration:
+        !If
+        - BBBECSFargate
+        - AwsvpcConfiguration:
+            AssignPublicIp: DISABLED
+            SecurityGroups:
+              - !Ref BBBECSTaskSecurityGroup
+            Subnets: !Ref BBBPrivateApplicationSubnets
+        - !Ref "AWS::NoValue"
+      LoadBalancers:
+        - ContainerName: greenlight
+          ContainerPort: 80
+          TargetGroupArn: !Ref BBBFrontendTG
+      TaskDefinition: !Ref BBBgreenlightTaskdefinition
+      HealthCheckGracePeriodSeconds: 60
+      LaunchType: !If [ BBBECSFargate, FARGATE, !Ref "AWS::NoValue" ]
+
+  BBBgreenlightServiceScalingTarget:
+    Type: AWS::ApplicationAutoScaling::ScalableTarget
+    DependsOn: BBBAutoscalingRole
+    Properties:
+      MaxCapacity: !Ref BBBGreenlightMaxReplicas
+      MinCapacity: !Ref BBBGreenlightMinReplicas
+      ResourceId:
+        !Join [
+            "",
+            [ service/, !Ref BBBECSCluster, /, !GetAtt [ BBBgreenlightService, Name ] ],
+        ]
+      RoleARN: !GetAtt BBBAutoscalingRole.Arn
+      ScalableDimension: ecs:service:DesiredCount
+      ServiceNamespace: ecs
+
+  BBBgreenlightServiceScalingPolicy:
+    Type: AWS::ApplicationAutoScaling::ScalingPolicy
+    DependsOn: BBBAutoscalingRole
+    Properties:
+      PolicyName: BBBgreenlightTargetTrackingPolicy
+      PolicyType: TargetTrackingScaling
+      ScalingTargetId: !Ref BBBgreenlightServiceScalingTarget
+      TargetTrackingScalingPolicyConfiguration:
+        TargetValue: 80
+        DisableScaleIn: False
+        ScaleInCooldown: 15
+        ScaleOutCooldown: 15
+        PredefinedMetricSpecification:
+          PredefinedMetricType: ALBRequestCountPerTarget
+          ResourceLabel: !Join [ "/", [ !GetAtt BBBFrontendALB.LoadBalancerFullName, !GetAtt BBBFrontendTG.TargetGroupFullName ] ]
+
+  BBBScaleliteTaskdefinition:
+    Type: AWS::ECS::TaskDefinition
+    Properties:
+      Family: !Join [ "", [ !Ref "AWS::StackName", -scalelite ] ]
+      ExecutionRoleArn: !Ref BBBScaleliteExecutionRole
+      NetworkMode: !If [ BBBECSFargate, awsvpc, !Ref "AWS::NoValue" ]
+      Memory: !Ref BBBScaleliteMemory
+      Cpu: !Ref BBBScaleliteCPU
+      TaskRoleArn: !Ref BBBScaleliteRole
+      RequiresCompatibilities:
+        !If
+        - BBBECSFargate
+        - - FARGATE
+        - !Ref "AWS::NoValue"
+      Volumes:
+        - Name: !Join [ "", [ scalelite-recordings-volume-spool, !Ref BBBEnvironmentStage ] ]
+          EFSVolumeConfiguration:
+            FilesystemId: !Ref BBBSharedStorageFS
+            TransitEncryption: ENABLED
+            AuthorizationConfig:
+              AccessPointId: !Ref BBBSharedStorageAPspool
+              IAM: ENABLED
+        - Name: !Join [ "", [ scalelite-recordings-volume-published, !Ref BBBEnvironmentStage ] ]
+          EFSVolumeConfiguration:
+            FilesystemId: !Ref BBBSharedStorageFS
+            TransitEncryption: ENABLED
+            AuthorizationConfig:
+              AccessPointId: !Ref BBBSharedStorageAPpublished
+              IAM: ENABLED
+        - Name: !Join [ "", [ scalelite-recordings-volume-unpublished, !Ref BBBEnvironmentStage ] ]
+          EFSVolumeConfiguration:
+            FilesystemId: !Ref BBBSharedStorageFS
+            TransitEncryption: ENABLED
+            AuthorizationConfig:
+              AccessPointId: !Ref BBBSharedStorageAPunpublished
+              IAM: ENABLED
+        - Name: !Join [ "", [ scalelite-recordings-volume-recordings, !Ref BBBEnvironmentStage ] ]
+          EFSVolumeConfiguration:
+            FilesystemId: !Ref BBBSharedStorageFS
+            TransitEncryption: ENABLED
+            AuthorizationConfig:
+              AccessPointId: !Ref BBBSharedStorageAPrecordings
+              IAM: ENABLED
+      ContainerDefinitions:
+        - Name: scalelite-importer
+          Essential: true
+          Image:
+            !Join
+              - '/'
+              - - !Ref BBBECRRegistry 
+                - !Ref BBBScaleliteImporterImage
+          MountPoints:
+            - ContainerPath: /var/bigbluebutton/spool
+              SourceVolume: !Join [ "", [ scalelite-recordings-volume-spool, !Ref BBBEnvironmentStage ] ]
+            - ContainerPath: /var/bigbluebutton/published
+              SourceVolume: !Join [ "", [ scalelite-recordings-volume-published, !Ref BBBEnvironmentStage ] ]
+            - ContainerPath: /var/bigbluebutton/unpublished
+              SourceVolume: !Join [ "", [ scalelite-recordings-volume-unpublished, !Ref BBBEnvironmentStage ] ]
+            - ContainerPath: /var/bigbluebutton/recording/scalelite
+              SourceVolume: !Join [ "", [ scalelite-recordings-volume-recordings, !Ref BBBEnvironmentStage ] ]
+          LogConfiguration:
+            LogDriver: awslogs
+            Options:
+              awslogs-group: !Ref BBBApplicationLogsGroup
+              awslogs-region: !Ref "AWS::Region"
+              awslogs-stream-prefix: scalelite-importer
+          HealthCheck:
+            Command:
+              - CMD-SHELL
+              - exit 0
+          Secrets:
+            - Name: SECRET_KEY_BASE
+              ValueFrom: !Sub "${BBBApplicationBaseSecret}:basekeyvalue::"
+            - Name: LOADBALANCER_SECRET
+              ValueFrom: !Sub "${BBBLoadbalancerSecret}:basekeyvalue::"
+            - Name: DATABASE_URL
+              ValueFrom: !Sub "${BBBRDSDBConnectionSecret}:connectionString::"
+          Environment:
+            - Name: REDIS_URL
+              Value: !Sub
+                - "redis://${BBBCacheDBAddress}:${BBBCacheDBPort}"
+                - BBBCacheDBAddress: !Ref BBBCacheDBAddress
+                  BBBCacheDBPort: !Ref BBBCacheDBPort
+            - Name: BEHIND_PROXY
+              Value: 'true'
+            - Name: NGINX_BEHIND_PROXY
+              Value: 'true'
+
+        - Name: scalelite-poller
+          Essential: true
+          Image: 
+            !Join
+              - '/'
+              - - !Ref BBBECRRegistry
+                - !Ref BBBScalelitePollerImage
+          LogConfiguration:
+            LogDriver: awslogs
+            Options:
+              awslogs-group: !Ref BBBApplicationLogsGroup
+              awslogs-region: !Ref "AWS::Region"
+              awslogs-stream-prefix: scalelite-poller
+          HealthCheck:
+            Command:
+              - CMD-SHELL
+              - exit 0
+          Secrets:
+            - Name: SECRET_KEY_BASE
+              ValueFrom: !Sub "${BBBApplicationBaseSecret}:basekeyvalue::"
+            - Name: LOADBALANCER_SECRET
+              ValueFrom: !Sub "${BBBLoadbalancerSecret}:basekeyvalue::"
+            - Name: DATABASE_URL
+              ValueFrom: !Sub "${BBBRDSDBConnectionSecret}:connectionString::"
+          Environment:
+            - Name: REDIS_URL
+              Value: !Sub
+                - "redis://${BBBCacheDBAddress}:${BBBCacheDBPort}"
+                - BBBCacheDBAddress: !Ref BBBCacheDBAddress
+                  BBBCacheDBPort: !Ref BBBCacheDBPort
+            - Name: BEHIND_PROXY
+              Value: true
+            - Name: NGINX_BEHIND_PROXY
+              Value: 'true'
+        - Name: scalelite-nginx
+          Essential: true
+          DependsOn:
+            - ContainerName: scalelite-importer
+              Condition: START
+          Image:
+            !Join
+              - '/'
+              - - !Ref BBBECRRegistry
+                - !Ref BBBScaleliteNginxImage
+          EntryPoint:
+            !If
+            - BBBECSFargate
+            - - "sh"
+              - "-c"
+            - !Ref "AWS::NoValue"
+          Command:
+            !If
+            - BBBECSFargate
+            - - "/bin/sh -c \"sed -i 's/scalelite-api/127.0.0.1/g' /etc/nginx/conf.d/scalelite-proxy.template && /etc/nginx/start -g daemon off\""
+            - !Ref "AWS::NoValue"
+          Links:
+            !If
+            - BBBECSEC2
+            - - scalelite-api:scalelite-api
+            - !Ref "AWS::NoValue"
+          MountPoints:
+            - ContainerPath: /var/bigbluebutton/spool
+              SourceVolume: !Join [ "", [ scalelite-recordings-volume-spool, !Ref BBBEnvironmentStage ] ]
+            - ContainerPath: /var/bigbluebutton/published
+              SourceVolume: !Join [ "", [ scalelite-recordings-volume-published, !Ref BBBEnvironmentStage ] ]
+            - ContainerPath: /var/bigbluebutton/unpublished
+              SourceVolume: !Join [ "", [ scalelite-recordings-volume-unpublished, !Ref BBBEnvironmentStage ] ]
+            - ContainerPath: /var/bigbluebutton/recording/scalelite
+              SourceVolume: !Join [ "", [ scalelite-recordings-volume-recordings, !Ref BBBEnvironmentStage ] ]
+          LogConfiguration:
+            LogDriver: awslogs
+            Options:
+              awslogs-group: !Ref BBBApplicationLogsGroup
+              awslogs-region: !Ref "AWS::Region"
+              awslogs-stream-prefix: scalelite-nginx
+          PortMappings:
+            - ContainerPort: 80
+          HealthCheck:
+            Command:
+              - CMD-SHELL
+              - exit 0
+          Secrets:
+            - Name: SECRET_KEY_BASE
+              ValueFrom: !Sub "${BBBApplicationBaseSecret}:basekeyvalue::"
+            - Name: LOADBALANCER_SECRET
+              ValueFrom: !Sub "${BBBLoadbalancerSecret}:basekeyvalue::"
+            - Name: DATABASE_URL
+              ValueFrom: !Sub "${BBBRDSDBConnectionSecret}:connectionString::"
+          Environment:
+            - Name: REDIS_URL
+              Value: !Sub
+                - "redis://${BBBCacheDBAddress}:${BBBCacheDBPort}"
+                - BBBCacheDBAddress: !Ref BBBCacheDBAddress
+                  BBBCacheDBPort: !Ref BBBCacheDBPort
+            - Name: BEHIND_PROXY
+              Value: true
+            - Name: NGINX_BEHIND_PROXY
+              Value: 'true'
+            - Name: URL_HOST
+              Value: !Sub scalelite.${BBBDomainName}
+        - Name: scalelite-api
+          Essential: true
+          Image: 
+            !Join
+              - '/'
+              - - !Ref BBBECRRegistry
+                - !Ref BBBScaleliteApiImage
+          MountPoints:
+            - ContainerPath: /var/bigbluebutton/spool
+              SourceVolume: !Join [ "", [ scalelite-recordings-volume-spool, !Ref BBBEnvironmentStage ] ]
+            - ContainerPath: /var/bigbluebutton/published
+              SourceVolume: !Join [ "", [ scalelite-recordings-volume-published, !Ref BBBEnvironmentStage ] ]
+            - ContainerPath: /var/bigbluebutton/unpublished
+              SourceVolume: !Join [ "", [ scalelite-recordings-volume-unpublished, !Ref BBBEnvironmentStage ] ]
+            - ContainerPath: /var/bigbluebutton/recording/scalelite
+              SourceVolume: !Join [ "", [ scalelite-recordings-volume-recordings, !Ref BBBEnvironmentStage ] ]
+          LogConfiguration:
+            LogDriver: awslogs
+            Options:
+              awslogs-group: !Ref BBBApplicationLogsGroup
+              awslogs-region: !Ref "AWS::Region"
+              awslogs-stream-prefix: scalelite-api
+          Command:
+            - /bin/sh
+            - -c
+            - bin/rake db:setup; bin/start
+          HealthCheck:
+            Command:
+              - CMD-SHELL
+              - exit 0
+          Secrets:
+            - Name: SECRET_KEY_BASE
+              ValueFrom: !Sub "${BBBApplicationBaseSecret}:basekeyvalue::"
+            - Name: LOADBALANCER_SECRET
+              ValueFrom: !Sub "${BBBLoadbalancerSecret}:basekeyvalue::"
+            - Name: DATABASE_URL
+              ValueFrom: !Sub "${BBBRDSDBConnectionSecret}:connectionString::"
+          Environment:
+            - Name: REDIS_URL
+              Value: !Sub
+                - "redis://${BBBCacheDBAddress}:${BBBCacheDBPort}"
+                - BBBCacheDBAddress: !Ref BBBCacheDBAddress
+                  BBBCacheDBPort: !Ref BBBCacheDBPort
+            - Name: BEHIND_PROXY
+              Value: true
+            - Name: NGINX_BEHIND_PROXY
+              Value: 'true'
+
+  BBBScaleliteAddServerTaskdefinition:
+    Type: AWS::ECS::TaskDefinition
+    Properties:
+      Family: !Join [ "", [ !Ref "AWS::StackName", -scalelite-handle-server ] ]
+      ExecutionRoleArn: !Ref BBBScaleliteExecutionRole
+      NetworkMode: !If [ BBBECSFargate, awsvpc, !Ref "AWS::NoValue" ]
+      Memory: 512
+      Cpu: 256
+      RequiresCompatibilities:
+        !If
+        - BBBECSFargate
+        - - FARGATE
+        - !Ref "AWS::NoValue"
+      ContainerDefinitions:
+        - Name: scalelite-handle-server
+          Essential: true
+          Image:
+            !Join
+              - '/'
+              - - !Ref BBBECRRegistry
+                - !Ref BBBScaleliteApiImage
+          LogConfiguration:
+            LogDriver: awslogs
+            Options:
+              awslogs-group: !Ref BBBApplicationLogsGroup
+              awslogs-region: !Ref "AWS::Region"
+              awslogs-stream-prefix: scalelite-api
+          HealthCheck:
+            Command:
+              - CMD-SHELL
+              - exit 0
+          Secrets:
+            - Name: SECRET_KEY_BASE
+              ValueFrom: !Sub "${BBBApplicationBaseSecret}:basekeyvalue::"
+            - Name: LOADBALANCER_SECRET
+              ValueFrom: !Sub "${BBBLoadbalancerSecret}:basekeyvalue::"
+            - Name: DATABASE_URL
+              ValueFrom: !Sub "${BBBRDSDBConnectionSecret}:connectionString::"
+          Environment:
+            - Name: REDIS_URL
+              Value: !Sub
+                - "redis://${BBBCacheDBAddress}:${BBBCacheDBPort}"
+                - BBBCacheDBAddress: !Ref BBBCacheDBAddress
+                  BBBCacheDBPort: !Ref BBBCacheDBPort
+
+  BBBScaleliteService:
+    Type: AWS::ECS::Service
+    DependsOn: BBBScaleliteALBListener
+    Properties:
+      Cluster: !Ref BBBECSCluster
+      DesiredCount: !Ref BBBScaleliteDesiredReplicas
+      TaskDefinition: !Ref BBBScaleliteTaskdefinition
+      PlatformVersion: !If [ BBBECSFargate, 1.4.0, !Ref "AWS::NoValue" ]
+      NetworkConfiguration:
+        !If
+        - BBBECSFargate
+        - AwsvpcConfiguration:
+            AssignPublicIp: DISABLED
+            SecurityGroups:
+              - !Ref BBBECSTaskSecurityGroup
+            Subnets: !Ref BBBPrivateApplicationSubnets
+        - !Ref "AWS::NoValue"
+      LoadBalancers:
+        - ContainerName: scalelite-nginx
+          ContainerPort: 80
+          TargetGroupArn: !Ref BBBScaleliteTG
+      LaunchType: !If [ BBBECSFargate, FARGATE, !Ref "AWS::NoValue" ]
+
+  BBBScaleliteServiceScalingTarget:
+    Type: AWS::ApplicationAutoScaling::ScalableTarget
+    Properties:
+      MaxCapacity: !Ref BBBScaleliteMaxReplicas
+      MinCapacity: !Ref BBBScaleliteMinReplicas
+      ResourceId:
+        !Join [
+            "",
+            [ service/, !Ref BBBECSCluster, /, !GetAtt [ BBBScaleliteService, Name ] ],
+        ]
+      RoleARN: !GetAtt BBBAutoscalingRole.Arn
+      ScalableDimension: ecs:service:DesiredCount
+      ServiceNamespace: ecs
+
+  BBBscaliteServiceScalingPolicyCPU:
+    Type: AWS::ApplicationAutoScaling::ScalingPolicy
+    Properties:
+      PolicyName: BBBscaliteTargetTrackingPolicyCPU
+      PolicyType: TargetTrackingScaling
+      ScalingTargetId: !Ref BBBScaleliteServiceScalingTarget
+      TargetTrackingScalingPolicyConfiguration:
+        TargetValue: 75
+        DisableScaleIn: False
+        ScaleInCooldown: 60
+        ScaleOutCooldown: 15
+        PredefinedMetricSpecification:
+          PredefinedMetricType: ECSServiceAverageCPUUtilization
+
+  BBBscaliteServiceScalingPolicyMEM:
+    Type: AWS::ApplicationAutoScaling::ScalingPolicy
+    Properties:
+      PolicyName: BBBscaliteTargetTrackingPolicyMEM
+      PolicyType: TargetTrackingScaling
+      ScalingTargetId: !Ref BBBScaleliteServiceScalingTarget
+      TargetTrackingScalingPolicyConfiguration:
+        TargetValue: 75
+        DisableScaleIn: False
+        ScaleInCooldown: 60
+        ScaleOutCooldown: 15
+        PredefinedMetricSpecification:
+          PredefinedMetricType: ECSServiceAverageMemoryUtilization
+
+Outputs:
+  BBBScaleliteTaskExecutionRole:
+    Description: Scalelite Task Execution Role ARN
+    Value: !GetAtt BBBScaleliteExecutionRole.Arn
+  BBBGreenlightTaskExecutionRole:
+    Description: Scalelite Task Execution Role ARN
+    Value: !GetAtt BBBGreenlightTaskExecutionRole.Arn
+  BBBApplicationBaseSecret:
+    Description: The Big Blue Button Application Base Secret
+    Value: !Ref BBBApplicationBaseSecret
+  BBBLoadbalancerSecret:
+    Description: The Big Blue Button Load Balancer Secret
+    Value: !Ref BBBLoadbalancerSecret
+  BBBAutoscalingRole:
+    Description: Role for the Autoscaling Instances
+    Value: !Ref BBBAutoscalingRole
+  BBBPublicCertificate:
+    Description: SSL Cert for the Frontend
+    Condition: BBBACMNewCert
+    Value: !Ref BBBPublicCertificate
+  BBBFrontendALB:
+    Description: Frontend Application Load Balancer
+    Value: !Ref BBBFrontendALB
+  BBBFrontendALBListener:
+    Description: Frontend Application Load Balancer Listener
+    Value: !Ref BBBFrontendALBListener
+  BBBFrontendALBListenerHTTP2HTTPS:
+    Description: Frontend Application Load Balancer Listener HTTP Redirect
+    Value: !Ref BBBFrontendALBListenerHTTP2HTTPS
+  BBBFrontendTG:
+    Description: Frontend Application Load Balancer Target Group
+    Value: !Ref BBBFrontendTG
+  BBBFrontendALBDNS:
+    Description: Frontend Application Load Balancer DNS Record
+    Value: !Ref BBBFrontendALBDNS
+  BBBScaleliteALBDNSName:
+    Description: Scalelite Application Load Balancer DNS Record
+    Value: !Ref BBBScaleliteALBDNSName
+  BBBScaleliteALB:
+    Description: Scalelite Application Load Balancer
+    Value: !Ref BBBScaleliteALB
+  BBBScaleliteALBListener:
+    Description: Scalelite Application Load Balancer Listener
+    Value: !Ref BBBScaleliteALBListener
+  BBBScaleliteTG:
+    Description: Scalelite Application Load Balancer Target Group
+    Value: !Ref BBBScaleliteTG
+  BBBgreenlightTaskdefinition:
+    Description: Frontend Task Definition
+    Value: !Ref BBBgreenlightTaskdefinition
+  BBBgreenlightService:
+    Description: Frontend Service
+    Value: !Ref BBBgreenlightService
+  BBBScaleliteTaskdefinition:
+    Description: Scalelite Task Definition
+    Value: !Ref BBBScaleliteTaskdefinition
+  BBBScaleliteAddServerTaskdefinition:
+    Description: Scalelite Server Handler Task Definition
+    Value: !Ref BBBScaleliteAddServerTaskdefinition
+  BBBScaleliteService:
+    Description: Scalelite Service
+    Value: !Ref BBBScaleliteService

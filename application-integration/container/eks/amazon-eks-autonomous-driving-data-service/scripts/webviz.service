@@ -1,0 +1,10 @@
+[Unit]
+Description=webviz service
+
+[Service]
+User=ubuntu
+ExecStart=/usr/local/bin/start-webviz.sh
+Restart=on-abort
+
+[Install]
+WantedBy=multi-user.target

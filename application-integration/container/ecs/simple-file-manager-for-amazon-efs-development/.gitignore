@@ -1,0 +1,29 @@
+# compiled output
+**/dist
+**/global-s3-assets
+**/regional-s3-assets
+**/open-source
+**/.zip
+**/tmp
+**/out-tsc
+**/.chalice/deployments
+**/source/helper/webapp-manifest.json
+
+# dependencies
+**/node_modules
+
+# e2e
+**/e2e/*.js
+**/e2e/*.map
+
+# misc
+**/npm-debug.log
+**/testem.log
+**/package-lock.json
+**/.vscode/settings.json
+**/__pycache__
+# System Files
+**/.DS_Store
+**/.vscode
+**/.idea
+
