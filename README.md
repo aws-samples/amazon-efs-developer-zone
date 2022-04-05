@@ -31,8 +31,10 @@ The Amazon EFS file system is built to scale on demand to petabytes without disr
 
 ## Recent Announcement 
 
-- [Amazon EFS Replication](https://aws.amazon.com/blogs/aws/new-replication-for-amazon-elastic-file-system-efs/) : 25th Jan 2022
-- [Amazon Elastic File System Sub-Millisecond Read Latency](https://aws.amazon.com/blogs/aws/amazon-elastic-file-system-update-sub-millisecond-read-latency/) : 14th Feb 2022
+| Announcement | Date | Link
+| --- | --- | ---
+| **Amazon EFS Replication** | 25th Jan 2022 | [Blog Post]((https://aws.amazon.com/blogs/aws/new-replication-for-amazon-elastic-file-system-efs/)) | 
+| **Amazon Elastic File System Sub-Millisecond Read Latency** | 14th Feb 2022 | [Blog Post]((https://aws.amazon.com/blogs/aws/amazon-elastic-file-system-update-sub-millisecond-read-latency/)) |
 
 ## How Amazon EFS Works
 
