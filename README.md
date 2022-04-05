@@ -30,7 +30,7 @@ So, if you are an application developer, what this means to you is that, you can
 
 The Amazon EFS file system is built to scale on demand to [petabytes](https://simple.wikipedia.org/wiki/Petabyte) without disrupting applications. EFS is a fully-managed service that makes it easy to set up and scale file storage in the Amazon Cloud. And hence it provides elastic storage capacity with a pay for what you use scheme (in contrast to EBS with which you pay for what you provision). EFS is elastic and grows and shrinks as you add and remove data. 
 
-## Recent Announcement 
+## Recent Announcements 
 
 | Announcement | Date | Blog Post
 | --- | --- | ---
