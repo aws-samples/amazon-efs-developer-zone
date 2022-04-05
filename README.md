@@ -1,6 +1,6 @@
 # Welcome to Amazon EFS Developer Zone
 
-Welcome to [Amazon Elastic File System(Amazon EFS)](https://docs.aws.amazon.com/efs/index.html) Developer Zone, your one shop store for all things around Amazon EFS and beyond. This page is intendent to all the builders who are new to Amazon EFS and would like to learn more about it. You will also get a better understanding of how Amazon EFS works and integrates with other AWS services and most importantly how you can leverage Amazon EFS for your application, wether your application runs on virtual machine, container, or is completely serverless. 
+Welcome to [Amazon Elastic File System(Amazon EFS)](https://docs.aws.amazon.com/efs/index.html) Developer Zone, your one shop store for all things around Amazon EFS and beyond. This page is intendent to all the builders who are new to Amazon EFS and would like to learn more about it. You will also get a better understanding of how Amazon EFS works and integrates with other AWS services and most importantly how you can leverage Amazon EFS for your application, whether your application runs on virtual machine, container, or is completely serverless. 
 
 ## Introduction 
 
@@ -17,7 +17,6 @@ You can access Amazon EFS from:
     - [AWS Fargate](https://aws.amazon.com/fargate/)
     - [AWS Lambda](https://docs.aws.amazon.com/lambda/index.html)
     - [Amazon SageMaker](https://docs.aws.amazon.com/sagemaker/index.html)
-
 
 ![](img/i1.png)
 
@@ -39,7 +38,7 @@ The Amazon EFS file system is built to scale on demand to [petabytes](https://si
 
 ## How Amazon EFS Works
 
-Now, lets get dive deep and understand how it works. Let’s take a closer look at how `Amazon EFS` works, compared to [Amazon Elastic Block Store (EBS)](https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/AmazonEBS.html) and [the instance store](https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/AmazonEBS.html). If we look at the image bellow, we will see that an EBS volume is tied to a data center (also called an AZ) and can only be attached over the network to a single EC2 instance from the same data center. Typically EBS volumes are used as the root volumes that contain the operating system, or for relational database systems to store the state. An instance store consists of a disk which directly attached to the hardware the EC2 instance is running on. An instance store can be regarded as ephemeral storage, and is therefore used for caching or for NoSQL databases with embedded data replication only. The data in an instance store persists only during the lifetime of its associated instance. If an instance reboots (intentionally or unintentionally), data in the instance store persists. However, data in the instance store is lost if the instance `stops` or `hibernates` or `terminates` or the `underlying disk drive fails`. 
+Now, let’s get dive deep and understand how it works. Let’s take a closer look at how `Amazon EFS` works, compared to [Amazon Elastic Block Store (EBS)](https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/AmazonEBS.html) and [the instance store](https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/AmazonEBS.html). If we look at the image bellow, we will see that an EBS volume is tied to a data center (also called an AZ) and can only be attached over the network to a single EC2 instance from the same data center. Typically EBS volumes are used as the root volumes that contain the operating system, or for relational database systems to store the state. An instance store consists of a disk which directly attached to the hardware the EC2 instance is running on. An instance store can be regarded as ephemeral storage, and is therefore used for caching or for NoSQL databases with embedded data replication only. The data in an instance store persists only during the lifetime of its associated instance. If an instance reboots (intentionally or unintentionally), data in the instance store persists. However, data in the instance store is lost if the instance `stops` or `hibernates` or `terminates` or the `underlying disk drive fails`. 
 
 ![](img/i2.png)
 
@@ -52,7 +51,6 @@ There are two main components to know about:
 The filesystem is the resource that stores your data within a AWS region, but you can’t access it directly. To do so, you must create an EFS mount target in a subnet. The mount target provides a network endpoint that you can use to mount the filesystem on an EC2 instance via NFSv4.1. You can create one mount target in each Availability Zone in an AWS Region. If there are multiple subnets in an Availability Zone in your VPC, you create one mount target in one of the subnets. 
 
 ![](img/i5.png)
-
 
 ## Creating a File System
 
@@ -122,7 +120,7 @@ MountTargetB:
 
 ## Application Integration of EFS with different compute resources 
 
-In the section we will go over each and every compute resource and look at how Amazon EFS works with all different compute resources, lets start with traditional compute, and see how we can make use of Amazon EFS with Amazon EC2  
+In the section we will go over each and every compute resource and look at how Amazon EFS works with all different compute resources, let’s start with traditional compute, and see how we can make use of Amazon EFS with Amazon EC2  
 
 ## Amazon EFS with Amazon EC2 instances
 
@@ -143,7 +141,6 @@ In this section we will dive into how you can setup Amazon EFS with AWS Lambda a
 | **Media file processing using AWS Lambda and Amazon EFS** | [![](img/efs-tutorial-button.png)](/application-integration/serverless/media-file-processing) |
 | **Machine Learning Inference using Amazon API Gateway, AWS Lambda and Amazon EFS** | [![](img/efs-tutorial-button.png)](https://github.com/aws-samples/ml-inference-using-aws-lambda-and-amazon-efs) |
 | **Zero administration inference with AWS Lambda for Huggingface** | [![](img/efs-tutorial-button.png)](/application-integration/serverless/ml-inference-with-aws-lambda-for-hugging-face/) |
-
 
 ## Amazon EFS with Container 
 
@@ -170,7 +167,6 @@ In this section we will dive into few of the solution which are powered by Amazo
 | **Data Service for ADAS and ADS Development** | [![](/img/efs-tutorial-button.png)](application-integration/container/eks/amazon-eks-autonomous-driving-data-service) |
 
 
-
 ## AWS re:Invernt Sessions 
 
 - [AWS re:Invent 2021 - Deep dive on Amazon EFS](https://www.youtube.com/watch?v=39bGVEgZcEE)
@@ -186,5 +182,6 @@ See [CONTRIBUTING](CONTRIBUTING.md#security-issue-notifications) for more inform
 ## License
 
 This library is licensed under the MIT-0 License. See the LICENSE file.
+
 
 
