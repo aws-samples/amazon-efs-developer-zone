@@ -1,4 +1,4 @@
-# Machine Learning with Kubeflow on Amazon EFS with Amazon EFS 
+# Machine Learning with Kubeflow on Amazon EKS with Amazon EFS 
 
 Training any Deep Learning model on a large dataset often takes a lot of time, specially when the size of the data set for training is in the range of 100s of GBs. And running such machine learning model at scale on cloud demands a sophisticated mechanism. 
 
