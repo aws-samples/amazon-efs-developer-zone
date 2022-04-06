@@ -1,6 +1,6 @@
 # Welcome to Amazon EFS Developer Zone
 
-Welcome to [Amazon Elastic File System(Amazon EFS)](https://docs.aws.amazon.com/efs/index.html) Developer Zone, your one shop store for all things around Amazon EFS and beyond. This page is intendent to all the builders who are new to Amazon EFS and would like to learn more about it. You will also get a better understanding of how Amazon EFS works and integrates with other AWS services and most importantly how you can leverage Amazon EFS for your application, whether your application runs on virtual machine, container, or is completely serverless. 
+Welcome to [Amazon Elastic File System(Amazon EFS)](https://docs.aws.amazon.com/efs/index.html) Developer Zone, your one shop store for all things around Amazon EFS and beyond. This page is intended to all the builders who are new to Amazon EFS and would like to learn more about it. You will also get a better understanding of how Amazon EFS works and integrates with other AWS services and most importantly how you can leverage Amazon EFS for your application, whether your application runs on virtual machine, container, or is completely serverless. 
 
 ## Introduction 
 
