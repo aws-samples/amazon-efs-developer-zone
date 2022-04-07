@@ -192,7 +192,7 @@ $ test -n "$AWS_REGION" && echo AWS_REGION is "$AWS_REGION" || echo AWS_REGION i
 ```bash 
 $ echo "export ACCOUNT_ID=${ACCOUNT_ID}" | tee -a ~/.bash_profile
 $ echo "export AWS_REGION=${AWS_REGION}" | tee -a ~/.bash_profile
-$ echo "export AZS=(${AZS[@]})" | tee -a ~/.bash_profile
+$ echo "export AZS=${AZS[@]}" | tee -a ~/.bash_profile
 $ aws configure set default.region ${AWS_REGION}
 $ aws configure get default.region
 ```
