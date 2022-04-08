@@ -50,23 +50,20 @@ $ kustomize version
 Version: {KustomizeVersion:3.2.0 GitCommit:a3103f1e62ddb5b696daa3fd359bb6f2e8333b49 BuildDate:2019-09-18T16:26:36Z GoOs:linux GoArch:amd64}
 ```
 
-Lets clone the [kubeflow-manifest repo](https://github.com/awslabs/kubeflow-manifests.git) and install `kubeflow` now using kustomize
+Lets clone this [amazon-efs-developer-zone repo](https://github.com/aws-samples/amazon-efs-developer-zone.git) and install `kubeflow` now using kustomize
 This installation might take couple of minutes, as it will deploy many different Pods in your EKS cluster. 
 
 
 ```bash
-$ export AWS_RELEASE_VERSION=v1.3.1-aws-b1.0.0
+$ git clone https://github.com/aws-samples/amazon-efs-developer-zone.git
 
-$ git clone https://github.com/awslabs/kubeflow-manifests.git
-Cloning into 'kubeflow-manifests'...
+Cloning into 'amazon-efs-developer-zone'...
 remote: Enumerating objects: 23488, done.
 ...
 ...
 Resolving deltas: 100% (13613/13613), done.
 
-$ cd kubeflow-manifests
-
-$ git checkout ${AWS_RELEASE_VERSION}
+$ cd amazon-efs-developer-zone/application-integration/container/eks/kubeflow/kubeflow-manifests
 
 $ while ! kustomize build example | kubectl apply -f -; do echo "Retrying to apply resources"; sleep 10; done
 
@@ -323,7 +320,8 @@ Successfully built b3189c0564da
 
 $ docker build -t my-repo .
 
-$ aws ecr get-login-password --region ap-southeast-1 | docker login --username AWS --password-stdin 123912348584.dkr.ecr.ap-southeast-1.amazonaws.com/my-repo
+$ aws ecr get-login-password --region $AWS_REGION | docker login --username AWS --password-stdin $IMAGE_URI
+
 WARNING! Your password will be stored unencrypted in /home/ec2-user/.docker/config.json.
 Configure a credential helper to remove this warning. See
 https://docs.docker.com/engine/reference/commandline/login/#credentials-store
