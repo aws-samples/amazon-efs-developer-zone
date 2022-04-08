@@ -112,8 +112,6 @@ gp2 (default)   kubernetes.io/aws-ebs   Delete          WaitForFirstConsumer   f
 3. Now, we can run the `auto-efs-setup.py`
 
 ```bash
-$ export CLUSTER_NAME=efsworkshop-eksctl
-
 $ cd distributions/aws/examples/storage/efs
 $ pip install -r requirements.txt
 $ python auto-efs-setup.py --region $CLUSTER_REGION --cluster $AWS_REGION --efs_file_system_name myEFS1
