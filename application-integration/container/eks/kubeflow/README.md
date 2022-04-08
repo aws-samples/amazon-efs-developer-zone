@@ -112,7 +112,7 @@ gp2 (default)   kubernetes.io/aws-ebs   Delete          WaitForFirstConsumer   f
 3. Now, we can run the `auto-efs-setup.py`
 
 ```bash
-$ cd distributions/aws/examples/storage/efs
+$ cd ml/efs
 $ pip install -r requirements.txt
 $ python auto-efs-setup.py --region $AWS_REGION --cluster $CLUSTER_NAME --efs_file_system_name myEFS1
 =================================================================
@@ -297,7 +297,7 @@ $ aws ecr create-repository \
 $ cd ..
 
 $ pwd
-/home/ec2-user/environment/kubeflow-manifests/distributions/aws/examples/storage
+/home/ec2-user/environment/amazon-efs-developer-zone/application-integration/container/eks/kubeflow/manifests/ml
 
 $ cd training-sample/
 
