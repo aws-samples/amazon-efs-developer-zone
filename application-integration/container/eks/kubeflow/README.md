@@ -273,7 +273,7 @@ dataset_url = "https://storage.googleapis.com/download.tensorflow.org/example_im
 ```bash
 
 $ aws ecr create-repository \
->     --repository-name my-repo
+     --repository-name my-repo
 {
     "repository": {
         "repositoryArn": "arn:aws:ecr:ap-southeast-1:123912348584:repository/my-repo",
