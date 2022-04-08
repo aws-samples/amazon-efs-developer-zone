@@ -333,8 +333,7 @@ $ docker push $IMAGE_URI
 $ cd -
 
 $ pwd 
-/home/ec2-user/environment/kubeflow-manifests/distributions/aws/examples/storage
-
+/home/ec2-user/environment/amazon-efs-developer-zone/application-integration/container/eks/kubeflow/manifests/ml
 
 ```
 
