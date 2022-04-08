@@ -303,7 +303,7 @@ $ cd training-sample/
 
 $ export IMAGE_URI=<repositoryUri:latest>
 
-$ docker build .
+$ docker build -t my-repo .
 Sending build context to Docker daemon  6.144kB
 Step 1/3 : FROM public.ecr.aws/c9e4w0g3/notebook-servers/jupyter-tensorflow:2.6.0-cpu-py38
 2.6.0-cpu-py38: Pulling from c9e4w0g3/notebook-servers/jupyter-tensorflow
@@ -314,9 +314,6 @@ Step 1/3 : FROM public.ecr.aws/c9e4w0g3/notebook-servers/jupyter-tensorflow:2.6.
 Removing intermediate container 040429cfaecd
  ---> b3189c0564da
 Successfully built b3189c0564da
-
-
-$ docker build -t my-repo .
 
 $ aws ecr get-login-password --region $AWS_REGION | docker login --username AWS --password-stdin $IMAGE_URI
 
