@@ -219,7 +219,7 @@ So, at this point you can make use of this Jupyter Notebook
 
 ## Creating a PVC for sharing training dataset 
 
-Now, we can create a PVC for your machine learning training dataset in `ReadWriteMany` mode meaning it can be used by many notebooks at the same time. You can go to the Kubeflow **Dashboard → Volumes →  New Volume** and create a new volume called dataset with efs-sc as the storage class
+Now, we can create a PVC for your machine learning training dataset in `ReadWriteMany` mode meaning it can be used by many notebooks at the same time. You can go to the Kubeflow **Dashboard → Volumes →  New Volume** and create a new volume called `dataset` with efs-sc as the storage class
 
 ![](/application-integration/container/eks/img/23.png)
 
