@@ -58,12 +58,13 @@ This installation might take couple of minutes, as it will deploy many different
 $ git clone https://github.com/aws-samples/amazon-efs-developer-zone.git
 
 Cloning into 'amazon-efs-developer-zone'...
-remote: Enumerating objects: 23488, done.
+remote: Enumerating objects: 4309, done.
+remote: Counting objects: 100% (4309/4309), done.
 ...
 ...
-Resolving deltas: 100% (13613/13613), done.
+Resolving deltas: 100% (1725/1725), done.
 
-$ cd amazon-efs-developer-zone/application-integration/container/eks/kubeflow/kubeflow-manifests
+$ cd amazon-efs-developer-zone/application-integration/container/eks/kubeflow/manifests
 
 $ while ! kustomize build example | kubectl apply -f -; do echo "Retrying to apply resources"; sleep 10; done
 
