@@ -4,9 +4,13 @@ In this section we will setup our working environment for few of the demos aroun
 
 | Tutorial | Link
 | --- | ---
-| **Static Provisioning using Amazon EFS for Amazon EKS** | [![](/img/efs-tutorial-button.png)](/application-integration/container/eck/static_provisioning) |
-| **Dynamic Provisioning using Amazon EFS for Amazon EKS** | [![](/img/efs-tutorial-button.png)](/application-integration/container/eks/dynamic_provisioning) |
+| **Static Provisioning using Amazon EFS for Amazon EKS** | [![](/img/efs-tutorial-button.png)](/application-integration/container/eks/static_provisioning) |
+| **Dynamic Provisioning using Amazon EFS for Amazon EKS** | [![](/img/efs-tutorial-button.png)](application-integration/container/eks/dynamic_provisioning) |
 | **Machine Learning at scale using Kubeflow on Amazon EKS with Amazon EFS** | [![](/img/efs-tutorial-button.png)](/application-integration/container/eks/kubeflow) |
+| **Building a cloud file manager using Amazon ECS(Fargate) and Amazon EFS** | [![](/img/efs-tutorial-button.png)](/application-integration/container/ecs/ecs-efs-demo/) |
+| **Bitcoin Blockchain with Amazon ECS and Amazon EFS** | [![](/img/efs-tutorial-button.png)](/application-integration/container/ecs/ecs-efs-bitcoin) |
+| **Persistence Configuration with Amazon EFS on Amazon EKS using AWS Fargate** | [![](/img/efs-tutorial-button.png)](/application-integration/container/eks/eks-efs-share-within-fargate-master) |
+
 
 
 
