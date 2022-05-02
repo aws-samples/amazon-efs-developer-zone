@@ -350,7 +350,7 @@ At this point we are all set for next set of hands on activity:
 
 | Tutorial | Link
 | --- | ---
-| **Static Provisioning using Amazon EFS for Amazon EKS** | [![](/img/efs-tutorial-button.png)](/application-integration/container/eck/static_provisioning) |
+| **Static Provisioning using Amazon EFS for Amazon EKS** | [![](/img/efs-tutorial-button.png)](/application-integration/container/eks/static_provisioning) |
 | **Dynamic Provisioning using Amazon EFS for Amazon EKS** | [![](/img/efs-tutorial-button.png)](/application-integration/container/eks/dynamic_provisioning) |
 | **Machine Learning at scale using Kubeflow on Amazon EKS with Amazon EFS** | [![](/img/efs-tutorial-button.png)](/application-integration/container/eks/kubeflow) |
 
