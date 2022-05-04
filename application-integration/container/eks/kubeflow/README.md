@@ -274,6 +274,8 @@ dataset_url = "https://storage.googleapis.com/download.tensorflow.org/example_im
 
 $ aws ecr create-repository \
      --repository-name my-repo
+
+
 {
     "repository": {
         "repositoryArn": "arn:aws:ecr:ap-southeast-1:123912348584:repository/my-repo",
@@ -294,7 +296,7 @@ $ aws ecr create-repository \
 3. Now, we can build the image locally in our Cloud9 instance and push it to our newly created ECR repository 
 
 ```bash
-$ cd ..
+$ cd /home/ec2-user/environment/amazon-efs-developer-zone/application-integration/container/eks/kubeflow/manifests/ml
 
 $ pwd
 /home/ec2-user/environment/amazon-efs-developer-zone/application-integration/container/eks/kubeflow/manifests/ml
