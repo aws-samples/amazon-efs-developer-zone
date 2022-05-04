@@ -152,9 +152,11 @@ gp2 (default)   kubernetes.io/aws-ebs   Delete          WaitForFirstConsumer   f
 
 ```bash
 $ kubectl patch storageclass gp2 -p '{"metadata": {"annotations":{"storageclass.kubernetes.io/is-default-class":"false"}}}'
+
 storageclass.storage.k8s.io/gp2 patched
 
 $ kubectl patch storageclass efs-sc -p '{"metadata": {"annotations":{"storageclass.kubernetes.io/is-default-class":"true"}}}'
+
 storageclass.storage.k8s.io/efs-sc patched
 
 $ kubectl get sc
