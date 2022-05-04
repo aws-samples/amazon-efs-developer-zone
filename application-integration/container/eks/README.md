@@ -208,12 +208,8 @@ $ aws sts get-caller-identity --query Arn \
     | grep efsworkshop-admin -q  && echo "IAM role valid" || echo "IAM role NOT valid"
 ```
 
-9. If the **IAM role** is not valid, **DO NOT PROCEED**. Go back and confirm the steps on this page.
+If the **IAM role** is not valid, **DO NOT PROCEED**. Go back and confirm the steps on this page.
 
-```bash
-$ aws sts get-caller-identity --query Arn | grep efsworkshop-admin -q  \
-                      && echo "IAM role valid" || echo "IAM role NOT valid"
-```
 ![](/application-integration/container/eks/img/11.png)
 
 ## Create an AWS KMS Custom Managed Key (CMK) 
