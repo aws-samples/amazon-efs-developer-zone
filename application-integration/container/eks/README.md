@@ -136,7 +136,7 @@ $ echo 'export LBC_VERSION="v2.3.0"' >>  ~/.bash_profile
 
 ## Create an IAM Role for your workspace
 
-1. Follow [this link](https://us-east-1.console.aws.amazon.com/iam/home?region=us-east-1&skipRegion=true#/roles$new?step=review&commonUseCase=EC2%2BEC2&selectedUseCase=EC2&policies=arn:aws:iam::aws:policy%2FAdministratorAccess&roleName=eksworkshop-admin) to create an **IAM role** with Administrator access.
+1. Follow [this link](https://us-east-1.console.aws.amazon.com/iam/home?region=us-east-1&skipRegion=true#/roles$new?step=review&commonUseCase=EC2%2BEC2&selectedUseCase=EC2&policies=arn:aws:iam::aws:policy%2FAdministratorAccess&roleName=efsworkshop-admin) to create an **IAM role** with Administrator access.
 
 ![](/application-integration/container/eks/img/4.png)
 
