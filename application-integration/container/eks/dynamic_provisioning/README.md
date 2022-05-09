@@ -44,15 +44,9 @@ Resolving deltas: 100% (1725/1725), done.
 
 ### Amazon EFS as Persistent Storage
 
-1. Create an OIDC provider for the cluster
+1. Now, we are going to make the setup for EFS, and we are going to use this script auto-efs-setup.py. The script automates all the Manual steps and use some default values for the file system name, performance mode etc. This script performs the following:
 
-```bash
- $ export CLUSTER_NAME=efsworkshop-eksctl
- $ eksctl utils associate-iam-oidc-provider --cluster $CLUSTER_NAME --approve 
-```
-
-2. Now, we are going to make the setup for EFS, and we are going to use this script auto-efs-setup.py. The script automates all the Manual steps and is only for `Dynamic Provisioning` option. The script applies some default values for the file system name, performance mode etc. This script performs the following:
-
+    * Create an OIDC provider for the cluster
     * Install the EFS CSI Driver
     * Create the IAM Policy for the CSI Driver
     * Create an EFS Filesystem 
@@ -66,12 +60,13 @@ NAME            PROVISIONER             RECLAIMPOLICY   VOLUMEBINDINGMODE      A
 gp2 (default)   kubernetes.io/aws-ebs   Delete          WaitForFirstConsumer   false                  148m
 ```
 
-3. Now, we can run the `auto-efs-setup.py`
+2. Now, we can run the `auto-efs-setup.py`
 
 ```bash
 $ cd /home/ec2-user/environment/amazon-efs-developer-zone/application-integration/container/eks/dynamic_provisioning
 
 $ pip install -r requirements.txt
+
 $ python auto-efs-setup.py --region $AWS_REGION --cluster $CLUSTER_NAME --efs_file_system_name myEFSDP
 =================================================================
                           EFS Setup
@@ -95,7 +90,7 @@ Dynamic provisioning setup done!
 =================================================================
 ```
 
-4. Now we can verify the `Storage Class` in the Kubernetes cluster 
+3. Now we can verify the `Storage Class` in the Kubernetes cluster 
 
 ```bash
 $ kubectl get sc
@@ -103,7 +98,7 @@ NAME            PROVISIONER             RECLAIMPOLICY   VOLUMEBINDINGMODE      A
 gp2 (default)   kubernetes.io/aws-ebs   Delete          WaitForFirstConsumer   false                  43m
 my-efs-sc-1     efs.csi.aws.com         Delete          Immediate              false                  14s
 ```
-5. We can see the EFS file system in the console as well 
+4. We can see the EFS file system in the console as well 
 
 ![](/application-integration/container/eks/img/33.png)
 

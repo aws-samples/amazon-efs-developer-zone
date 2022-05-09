@@ -1,17 +1,96 @@
 ## Static Provisioning
 This example shows how to make a static provisioned EFS persistent volume (PV) mounted inside container.
 
-### Create an EFS File System 
-But before we go ahead, make sure you have already setup your workspace as per [this tutorial](/application-integration/container/eks/) on your AWS Cloud9 instance and the Amazon EKS cluster is up and running. First we need to create an EFS file system, you can do so using CLI, SDK, or AWS Console. 
-Just make sure you use the right VPN and Security Group while creating the mount targets 
+### Prerequisite 
+But before we go ahead, make sure you have already setup your workspace as per [this tutorial](/application-integration/container/eks/) on your AWS Cloud9 instance and the Amazon EKS cluster is up and running. 
 
-![](/application-integration/container/eks/img/30.png)
+```bash
+
+$ eksctl get cluster
+
+2022-05-09 18:03:29 [ℹ]  eksctl version 0.96.0
+2022-05-09 18:03:29 [ℹ]  using region us-east-2
+NAME                    REGION          EKSCTL CREATED
+efsworkshop-eksctl      us-east-2       True
+
+$ kubectl get nodes
+
+NAME                                           STATUS   ROLES    AGE   VERSION
+ip-192-168-12-120.us-east-2.compute.internal   Ready    <none>   14m   v1.21.5-eks-9017834
+ip-192-168-17-202.us-east-2.compute.internal   Ready    <none>   14m   v1.21.5-eks-9017834
+ip-192-168-33-44.us-east-2.compute.internal    Ready    <none>   14m   v1.21.5-eks-9017834
+ip-192-168-35-239.us-east-2.compute.internal   Ready    <none>   14m   v1.21.5-eks-9017834
+ip-192-168-6-197.us-east-2.compute.internal    Ready    <none>   14m   v1.21.5-eks-9017834
+
+
+```
+
+Clone this [amazon-efs-developer-zone repo](https://github.com/aws-samples/amazon-efs-developer-zone.git). 
+
+```bash
+
+$ git clone https://github.com/aws-samples/amazon-efs-developer-zone.git
+
+Cloning into 'amazon-efs-developer-zone'...
+remote: Enumerating objects: 4309, done.
+remote: Counting objects: 100% (4309/4309), done.
+...
+...
+Resolving deltas: 100% (1725/1725), done.
+
+```
+
+
+### Amazon EFS as Persistent Storage
+
+1. Now, we are going to make the setup for EFS, and we are going to use this script auto-efs-setup.py. The script automates all the Manual steps and use some default values for the file system name, performance mode etc. This script performs the following:
+
+    * Create an OIDC provider for the cluster
+    * Install the EFS CSI Driver
+    * Create the IAM Policy for the CSI Driver
+    * Create an EFS Filesystem 
+
+   But before that, lets look at the exiting `Storage Class` 
+
+```bash
+$ kubectl get sc
+NAME            PROVISIONER             RECLAIMPOLICY   VOLUMEBINDINGMODE      ALLOWVOLUMEEXPANSION   AGE
+gp2 (default)   kubernetes.io/aws-ebs   Delete          WaitForFirstConsumer   false                  148m
+```
+
+2. Now, we can run the `auto-efs-setup.py`
+
+```bash
+$ cd /home/ec2-user/environment/amazon-efs-developer-zone/application-integration/container/eks/static_provisioning
+
+$ pip install -r requirements.txt
+
+$ python auto-efs-setup.py --region $AWS_REGION --cluster $CLUSTER_NAME --efs_file_system_name myEFSSP
+=================================================================
+                          EFS Setup
+=================================================================
+                   Prerequisites Verification
+=================================================================
+Verifying OIDC provider...
+OIDC provider found
+Verifying eksctl is installed...
+eksctl found!
+...
+...
+Setting up dynamic provisioning...
+Editing storage class with appropriate values...
+Creating storage class...
+storageclass.storage.k8s.io/efs-sc created
+Storage class created!
+Dynamic provisioning setup done!
+=================================================================
+                      EFS Setup Complete
+=================================================================
+```
 
 Once you create the file system, wait for the FS state to turn `Available` and take a note of the **File system ID** as this we would need next when we create the `Persistent Volume` 
 
 ![](/application-integration/container/eks/img/31.png)
-
-
 
 ## Create Persistent Volume
 
