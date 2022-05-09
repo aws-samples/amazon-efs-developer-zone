@@ -95,28 +95,34 @@ Dynamic provisioning setup done!
 =================================================================
 ```
 
-Once you create the file system, wait for the FS state to turn `Available` and take a note of the **File system ID** as this we would need next when we create the `Storage Class` 
+4. Now we can verify the `Storage Class` in the Kubernetes cluster 
 
-![](/application-integration/container/eks/img/31.png)
+```bash
+$ kubectl get sc
+NAME            PROVISIONER             RECLAIMPOLICY   VOLUMEBINDINGMODE      ALLOWVOLUMEEXPANSION   AGE
+gp2 (default)   kubernetes.io/aws-ebs   Delete          WaitForFirstConsumer   false                  43m
+my-efs-sc-1     efs.csi.aws.com         Delete          Immediate              false                  14s
+```
+5. We can see the EFS file system in the console as well 
+
+![](/application-integration/container/eks/img/33.png)
 
 
-### Create the Storage Class 
+### Storage Class 
 
-Now we can create the `Storage Class` in our cluster, for that first edit this [storageclass.yaml](/application-integration/container/eks/dynamic_provisioning/sc.yaml) file 
+If you would like to check the `Storage Class` defination in your cluster, you can check the [storageclass.yaml](/application-integration/container/eks/dynamic_provisioning/sc.yaml) file which the `auto-efs-setup.py` used in the previous step. 
 
 ```yaml
-kind: StorageClass
 apiVersion: storage.k8s.io/v1
+kind: StorageClass
 metadata:
-  name: efs-sc
+  name: my-efs-sc-1
 provisioner: efs.csi.aws.com
 parameters:
+  directoryPerms: '700'
+  fileSystemId: <your file system ID>
   provisioningMode: efs-ap
-  fileSystemId: <place your file system ID>
-  directoryPerms: "700"
-  gidRangeStart: "1000"
-  gidRangeEnd: "2000"
-  basePath: "/dynamic_provisioning"
+
 ```
 
 * `provisioningMode` - The type of volume to be provisioned by efs. Currently, only access point based provisioning is supported `efs-ap`.
@@ -128,15 +134,23 @@ parameters:
 
 ### Deploy the Example
 
-Create storage class, persistent volume claim (PVC) and the pod which consumes PV:
+Although the `auto-efs-setup.py` script has created the storage class, but if you would like to make any changes in the storage class definition as per your requirement, you can delete the automatically created storage class and create it again.  
 ```bash
+
+$ kubectl delete -f sc.yaml
+
+storageclass.storage.k8s.io "my-efs-sc-1" deleted
+
+```
+Next, you can edit this [storageclass.yaml](/application-integration/container/eks/dynamic_provisioning/sc.yaml) file and then create the storage class, persistent volume claim (PVC) and the pod which consumes PV:
+
+```bash 
 $ kubectl apply -f sc.yaml
 storageclass.storage.k8s.io/my-efs-sc-1 created
 
 $ kubectl apply -f pvc_pod.yaml
 persistentvolumeclaim/efs-claim-1 created
 pod/efs-app-1 created
-
 ```
 
 ### Check EFS filesystem is used
@@ -158,6 +172,6 @@ Fri Apr 1 17:55:35 UTC 2022
 
 And now we can see the access point as well which the EFS CSI driver created under the hood when we deployed this application 
 
-![](/application-integration/container/eks/img/32.png)
+![](/application-integration/container/eks/img/34.png)
 
 
