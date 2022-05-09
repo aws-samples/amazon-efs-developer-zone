@@ -599,6 +599,6 @@ if __name__ == "__main__":
     AWS_ACCOUNT_ID = boto3.client('sts').get_caller_identity()["Account"]
     EFS_IAM_POLICY_NAME = "AmazonEKS_EFS_CSI_Driver_Policy"
     EFS_IAM_POLICY_ARN = f"arn:aws:iam::{AWS_ACCOUNT_ID}:policy/{EFS_IAM_POLICY_NAME}"
-    EFS_DYNAMIC_PROVISIONING_STORAGE_CLASS_FILE_PATH = "dynamic-provisioning/sc.yaml"
+    EFS_DYNAMIC_PROVISIONING_STORAGE_CLASS_FILE_PATH = "sc.yaml"
 
     main()
