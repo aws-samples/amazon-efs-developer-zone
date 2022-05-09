@@ -90,7 +90,7 @@ Dynamic provisioning setup done!
 
 Once you create the file system, wait for the FS state to turn `Available` and take a note of the **File system ID** as this we would need next when we create the `Persistent Volume` 
 
-![](/application-integration/container/eks/img/31.png)
+![](/application-integration/container/eks/img/35.png)
 
 ## Create Persistent Volume
 
@@ -121,7 +121,7 @@ You can find it using AWS CLI:
 $ aws efs describe-file-systems --query "FileSystems[*].FileSystemId"
 ```
 
-## Deploy the Example Application
+### Deploy the Example Application
 
 Create PV and persistent volume claim (PVC):
 ```sh
@@ -139,7 +139,7 @@ efs-app   1/1     Running   0          31s
 
 ```
 
-## Check EFS filesystem is used
+### Check EFS filesystem is used
 
 After the objects are created, verify that pod is running:
 
