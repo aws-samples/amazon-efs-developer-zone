@@ -39,13 +39,17 @@ remote: Counting objects: 100% (4309/4309), done.
 Resolving deltas: 100% (1725/1725), done.
 
 ```
+Create an OIDC provider for the cluster:
 
+```bash
+ $ export CLUSTER_NAME=efsworkshop-eksctl
+ $ eksctl utils associate-iam-oidc-provider --cluster $CLUSTER_NAME --approve 
+```
 
 ### Amazon EFS as Persistent Storage
 
 1. Now, we are going to make the setup for EFS, and we are going to use this script auto-efs-setup.py. The script automates all the Manual steps and use some default values for the file system name, performance mode etc. This script performs the following:
 
-    * Create an OIDC provider for the cluster
     * Install the EFS CSI Driver
     * Create the IAM Policy for the CSI Driver
     * Create an EFS Filesystem 
