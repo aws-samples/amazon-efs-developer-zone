@@ -2,15 +2,20 @@
 
 Training any Deep Learning model on a large dataset often takes a lot of time, specially when the size of the data set for training is in the range of 100s of GBs. And running such machine learning model at scale on cloud demands a sophisticated mechanism. 
 
-In this section, we will walk you through, how you can make use of [Kubeflow](https://www.kubeflow.org/), which is an open source toolkit that simplifies deploying machine learning workflows on Kubernetes on Amazon EKS and shall use Amazon EFS as a persistent storage in the backend, which will be used to staging the data for training, notebook and hosting the machine learning model. 
+In this section, we shall learn how we can leverage [Kubeflow](https://www.kubeflow.org/), which is an open source machine learning toolkit to deploy any machine learning workflows on Kubernetes environment. We are going to use Amazon Elastic Kubernetes Service(EKS) for deploying our Kubernetes cluster and Amazon Elastic File System(EFS) as a persistent storage in the backend, which will be used for staging the dataset for training, hosting jupyter notebooks and machine learning model. 
 
 ![](/application-integration/container/eks/img/15.png)
 
 ## Setting up the workspace
 
-But before we go ahead, make sure you have already setup your workspace as per [this tutorial](/application-integration/container/eks/) on your AWS Cloud9 instance and the Amazon EKS cluster is up and running. 
+But before we go ahead, make sure you have already setup your workspace as per [this tutorial](/application-integration/container/eks/) and complete the following: 
 
-Once that is all done, make sure we have everything installed and configured properly. 
+* Setting up the initial Cloud9 setup 
+* Installation of few of the Kubernetes tool kits 
+* Creating the Kubernetes cluster using Amazon EKS. 
+ 
+
+Once that is done, make sure you have everything installed and configured properly on your Cloud9 workspace.  
 
 ```bash 
 $ kubectl version
@@ -37,7 +42,7 @@ ip-192-168-8-172.us-west-1.compute.internal    Ready    <none>   8m44s   v1.21.5
 
 ## Installing Kubeflow 
 
-Next, we need to install kubeflow in our cluster, and we are going to use [kustomize](https://github.com/kubernetes-sigs/kustomize/releases/tag/v3.2.0), its a command line tool to customize Kubernetes objects through a kustomization file. Let's first install it and verify. 
+Next, we need to install kubeflow in our cluster, and we are going to use [kustomize] (https://github.com/kubernetes-sigs/kustomize/releases/tag/v3.2.0) for this. kustomise is a command line tool to customize Kubernetes objects through a kustomization file. Let's first install it and verify. 
 
 ```bash
 $ wget -O kustomize https://github.com/kubernetes-sigs/kustomize/releases/download/v3.2.0/kustomize_3.2.0_linux_amd64
@@ -69,8 +74,7 @@ $ cd amazon-efs-developer-zone/application-integration/container/eks/kubeflow/ma
 $ while ! kustomize build example | kubectl apply -f -; do echo "Retrying to apply resources"; sleep 10; done
 
 ```
-
-After installation, it will take some time for all `Pods` to become ready. Make sure all `Pods` are ready before trying to connect, otherwise you might get unexpected errors. To check that all Kubeflow-related `Pods` are **ready**, use the following commands(just make sure the STATUS for each Pod is in Running state before moving ahead):
+After the installation, it will take some time for all Pods to become ready. Make sure all `Pods` are ready before we try to connect, otherwise we might get unexpected errors. To check that all kubeflow related `Pods` are ready, we can use the following commands(just make sure the **STATUS** for each Pod is in **Running** state before moving ahead):
 
 ```bash
 
@@ -83,7 +87,7 @@ $ kubectl get pods -n kubeflow
 $ kubectl get pods -n kubeflow-user-example-com
 
 ```
-So, now our Amazon EKS cluster is up and running with `kubeflow` installed, so the final setup would be to create an Amazon EFS file system and connect it with our EKS cluster so that `kubeflow` can make use of it
+So, now our Amazon EKS cluster is up and running with `kubeflow` installed, the final setup would be to create an Amazon EFS file system and connect it with our EKS cluster.
 
 ## Amazon EFS as Persistent Storage with Kubeflow
 
@@ -94,14 +98,14 @@ So, now our Amazon EKS cluster is up and running with `kubeflow` installed, so t
  $ eksctl utils associate-iam-oidc-provider --cluster $CLUSTER_NAME --approve 
 ```
 
-2. Now, we are going to make the setup for EFS, and we are going to use this script auto-efs-setup.py. The script automates all the Manual steps and is only for `Dynamic Provisioning` option. The script applies some default values for the file system name, performance mode etc. This script performs the following:
+2. Now, we are going to make the setup for EFS, and we are going to use this script auto-efs-setup.py. The script automates all the Manual steps and is only for `Dynamic Provisioning` option. The script applies some default values for the file system name, performance mode etc and performs the following:
 
     * Install the EFS CSI Driver
     * Create the IAM Policy for the CSI Driver
     * Create an EFS Filesystem 
     * Creates a Storage Class  for the cluster 
 
-   But before that, lets look at the exiting `Storage Class` 
+   Before we run this script, lets look at the exiting `Storage Class` 
 
 ```bash
 $ kubectl get sc
@@ -144,7 +148,7 @@ NAME            PROVISIONER             RECLAIMPOLICY   VOLUMEBINDINGMODE      A
 efs-sc          efs.csi.aws.com         Delete          WaitForFirstConsumer   true                   96s
 gp2 (default)   kubernetes.io/aws-ebs   Delete          WaitForFirstConsumer   false                  148m
 ```
-5. We can see the EFS file system in the console as well 
+5. Now, we can validate the EFS File System which got created in the AWS Console 
 
 ![](/application-integration/container/eks/img/17.png)
 
