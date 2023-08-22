@@ -37,17 +37,18 @@ Note: The following command adds more disk space to the root volume of the EC2 i
 ```python
 
 $ pip3 install --user --upgrade boto3
-$ export instance_id=$(curl -s http://169.254.169.254/latest/meta-data/instance-id)
+$ export INSTANCE_ID=$(curl -s http://169.254.169.254/latest/meta-data/instance-id)
+$ export REGION=$(curl -s http://169.254.169.254/latest/dynamic/instance-identity/document | jq -r .region)
 $ python -c "import boto3
 import os
 from botocore.exceptions import ClientError 
-ec2 = boto3.client('ec2')
+ec2 = boto3.client('ec2', region_name = os.getenv('REGION'))
 volume_info = ec2.describe_volumes(
     Filters=[
         {
             'Name': 'attachment.instance-id',
             'Values': [
-                os.getenv('instance_id')
+                os.getenv('INSTANCE_ID')
             ]
         }
     ]
