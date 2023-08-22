@@ -263,7 +263,7 @@ kind: ClusterConfig
 metadata:
   name: efsworkshop-eksctl
   region: ${AWS_REGION}
-  version: "1.21"
+  version: "1.25"
 
 availabilityZones: ["${AZS[0]}", "${AZS[1]}"]
 
