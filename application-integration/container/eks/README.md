@@ -35,7 +35,7 @@ Note: The following command adds more disk space to the root volume of the EC2 i
 ```
 
 ```python
-$ sudo yum install jq
+$ sudo yum install -y jq
 $ pip3 install --user --upgrade boto3
 $ export INSTANCE_ID=$(curl -s http://169.254.169.254/latest/meta-data/instance-id)
 $ export REGION=$(curl -s http://169.254.169.254/latest/dynamic/instance-identity/document | jq -r .region)
